@@ -226,6 +226,54 @@ class InstallerTests(unittest.TestCase):
                                 agents=["codex"], package_root=self.plugin)
         self.assertFalse((self.prefix/"current.json").exists())
 
+    @unittest.skipIf(os.name == "nt", "POSIX user launcher")
+    def test_command_registration_preserves_profiles_and_is_idempotent(self):
+        installed = self.install()
+        home = self.root/"home"
+        home.mkdir()
+        profile = home/".zshrc"
+        original = b"# existing setup\nexport KEEP_ME=yes\n"
+        profile.write_bytes(original)
+        with patch.object(manager.Path, "home", return_value=home), \
+                patch.dict(os.environ, {"PATH": "/usr/bin", "SHELL": "/bin/zsh", "ZDOTDIR": str(home)}):
+            first = manager.register_command(installed)
+            content = profile.read_bytes()
+            again = manager.register_command(installed)
+        self.assertTrue(content.startswith(original))
+        self.assertEqual(content.count(b"# AOS user command"), 1)
+        self.assertEqual(profile.read_bytes(), content)
+        self.assertEqual(first, again)
+        self.assertTrue(first["restart_terminal_required"])
+        self.assertEqual((home/".local/bin/aos").resolve(), Path(installed["cli"]).resolve())
+
+    @unittest.skipIf(os.name == "nt", "POSIX user launcher")
+    def test_foreign_command_is_not_replaced_or_added_to_path(self):
+        installed = self.install()
+        home = self.root/"home"
+        entry = home/".local/bin/aos"
+        entry.parent.mkdir(parents=True)
+        entry.write_text("user owned command")
+        with patch.object(manager.Path, "home", return_value=home), \
+                patch.dict(os.environ, {"PATH": "/usr/bin", "SHELL": "/bin/bash"}):
+            with self.assertRaisesRegex(manager.Failure, "not managed"):
+                manager.register_command(installed)
+        self.assertEqual(entry.read_text(), "user owned command")
+        self.assertFalse((home/".bashrc").exists())
+
+    @unittest.skipIf(os.name == "nt", "POSIX user launcher")
+    def test_registered_command_switches_between_owned_installations(self):
+        first = self.install()
+        home = self.root/"home"
+        with patch.object(manager.Path, "home", return_value=home), \
+                patch.dict(os.environ, {"PATH": str(home/".local/bin")}):
+            manager.register_command(first)
+            self.prefix = self.root/"second install"
+            second = self.install()
+            result = manager.register_command(second)
+        self.assertEqual((home/".local/bin/aos").resolve(), Path(second["cli"]).resolve())
+        self.assertFalse(result["restart_terminal_required"])
+        self.assertEqual(result["profiles"], [])
+
 
 class ArchiveTests(unittest.TestCase):
     def setUp(self):
@@ -287,7 +335,7 @@ class ArchiveTests(unittest.TestCase):
                              (self.root/"two"/asset["name"]).read_bytes())
         with zipfile.ZipFile(self.root/"one/aos.plugin") as archive:
             self.assertEqual(set(archive.namelist()), set(packager.FILES))
-        with tarfile.open(self.root/"one/aos-agent-0.1.0.tar.gz") as archive:
+        with tarfile.open(self.root/("one/aos-agent-"+one["manager_version"]+".tar.gz")) as archive:
             self.assertEqual(set(archive.getnames()), {"aos-agent/"+f for f in packager.FILES})
 
 
@@ -349,10 +397,16 @@ class UpdateTests(unittest.TestCase):
             command = list(map(str, run.call_args.args[0]))
             self.assertTrue(any(arg.endswith("setup.ps1" if os.name == "nt" else "setup.sh") for arg in command))
             self.assertIn("--non-interactive", command)
+            self.assertIn("--no-path", command)
             self.assertEqual(result["status"], "installed")
 
 
 class ProcessTests(unittest.TestCase):
+    def test_native_error_with_legacy_encoding_keeps_the_failure(self):
+        with self.assertRaisesRegex(manager.Failure, "exited 7"):
+            manager.run([sys.executable, "-I", "-c",
+                         "import sys; sys.stderr.buffer.write(b'failure: \\xff'); sys.exit(7)"])
+
     def test_subprocess_output_is_utf8_independent_of_console_codepage(self):
         result = manager.run([sys.executable, "-I", "-c",
                               "import sys; sys.stdout.buffer.write('路径中文'.encode('utf-8'))"])

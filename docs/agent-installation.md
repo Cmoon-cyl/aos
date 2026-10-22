@@ -1,7 +1,7 @@
 # 一键安装与维护
 
 一键安装支持 macOS arm64、GNU/Linux x86_64 和 Windows x64。运行时版本为
-AOS 0.2.0，安装管理器和插件版本为 0.1.0，两者分别报告版本。
+AOS 0.2.0，安装管理器和插件版本为 0.1.1，两者分别报告版本。
 网络下载使用公开 GitHub 发行包；不要求 GitHub 登录。
 
 ## 安装
@@ -32,6 +32,7 @@ v14 x64 Runtime 后重试。不会自动申请管理员权限或更改系统级�
 | `--agent codex` | 同时安装 Skill 到用户的 `~/.agents/skills/aos` |
 | `--agent claude` | 同时安装 Skill 到用户的 `~/.claude/skills/aos` |
 | `--agent trae` | 同时安装 Skill 到用户的 `~/.trae/skills/aos` |
+| `--no-path` | 跳过用户级命令注册及 shell / PATH 修改 |
 | `--non-interactive --json` | 无交互执行；安装管理器返回结构化 JSON |
 
 已有同名且不由 AOS 管理的 Skill 会被保留，并返回冲突错误。
@@ -39,8 +40,16 @@ v14 x64 Runtime 后重试。不会自动申请管理员权限或更改系统级�
 
 默认目录优先取 `AOS_HOME`；否则 macOS / Linux 使用
 `$XDG_DATA_HOME/aos` 或 `~/.local/share/aos`，Windows 使用
-`%LOCALAPPDATA%\AOS`。安装输出的 `data.cli` 和 `data.python` 可直接执行，
-无需激活虚拟环境或重新打开终端。安装器不会修改 PATH。
+`%USERPROFILE%\.aos`。安装输出的 `data.cli` 和 `data.python` 可直接执行，
+无需激活虚拟环境或重新打开终端。
+
+默认注册用户级 `aos` 命令。macOS / Linux 在 `~/.local/bin/aos` 建立入口，
+必要时向当前 shell 的用户启动文件追加带标记的 PATH 配置；支持 bash、zsh、sh 和 fish。
+已有非 AOS 管理的同名入口会报冲突。Windows 将安装目录的 `bin` 加入用户 PATH；
+`aos.cmd` 是入口文件名，日常输入 `aos` 即可。
+当 `data.command_registration.restart_terminal_required` 为 `true` 时，重新打开终端应用
+后使用短命令；当前终端继续使用 `data.cli`。`--no-path` 适用于隔离安装和自动化测试。
+更新和回滚沿用已注册的入口，不再修改 PATH。
 
 成功需同时满足 `ok: true`、`data.verification.status: "passed"`，
 以及 `data.verification.service_response.sum: 42`。验证会临时启动独立的
@@ -50,7 +59,7 @@ loopback Router 与 provider，最后停止它们。安装成功不代表后台�
 
 ## 本机环境
 
-下文的 `aos` 指安装结果中的绝对 CLI 路径。
+下文使用已注册的 `aos` 命令。Agent 应使用安装结果中的绝对 CLI 路径，避免依赖终端重启。
 
 ```sh
 aos --version
@@ -97,7 +106,7 @@ aos update rollback
 `aos update apply --request 文件路径`：
 
 ```json
-{"version":"0.1.0"}
+{"version":"0.1.1"}
 ```
 
 相同版本无需更新；降级使用 `update rollback`，切回上一个通过重新验证的安装。

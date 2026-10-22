@@ -13,7 +13,7 @@ container, or another host.
 
 1. Locate the installation using an explicit user prefix, AOS_HOME, or the
    default user data directory: ~/.local/share/aos on macOS/Linux and
-   %LOCALAPPDATA%\AOS on Windows. If scripts/installed-prefix.json exists, use
+   %USERPROFILE%\.aos on Windows. If scripts/installed-prefix.json exists, use
    its recorded prefix. Read current.json to get the absolute cli and python
    paths; do not depend on activation or a restarted shell.
 2. If no installation is present, run this skill's scripts/setup.sh on

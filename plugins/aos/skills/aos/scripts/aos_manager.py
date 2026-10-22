@@ -108,7 +108,7 @@ def default_prefix():
     if os.environ.get("AOS_HOME"):
         return Path(os.environ["AOS_HOME"]).expanduser().resolve()
     if os.name == "nt":
-        return Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "AOS"
+        return Path.home() / ".aos"
     return Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share")) / "aos"
 
 
@@ -139,7 +139,7 @@ def clean_environment():
 def run(command, *, cwd=None, env=None, input=None, timeout=180):
     try:
         result = subprocess.run(list(map(str, command)), cwd=cwd, env=env,
-                                input=input, text=True, encoding="utf-8", stdout=subprocess.PIPE,
+                                input=input, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, timeout=timeout)
     except subprocess.TimeoutExpired as error:
         raise Failure("COMMAND_TIMEOUT", f"{Path(str(command[0])).name} timed out.") from error
@@ -518,6 +518,110 @@ def install_skill(current, agent):
     return str(destination)
 
 
+def append_path_profile(path, block):
+    """Append one marked block, preserving all existing profile bytes."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    original = path.read_bytes() if path.exists() else b""
+    encoded = block.encode("utf-8")
+    if encoded in original:
+        return
+    if b"# AOS user command" in original:
+        raise Failure("PATH_PROFILE_CONFLICT", f"The AOS block was modified: {path}")
+    with path.open("ab") as stream:
+        stream.write(b"\n" + encoded)
+
+
+def register_command(current):
+    """Expose the verified dispatcher as `aos` in the user's terminal."""
+    cli = Path(current["cli"]).resolve()
+    if os.name == "nt":
+        import winreg
+        binary = str(cli.parent)
+        with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, "Environment", 0,
+                               winreg.KEY_READ | winreg.KEY_WRITE) as key:
+            try:
+                old, kind = winreg.QueryValueEx(key, "Path")
+            except FileNotFoundError:
+                old, kind = "", winreg.REG_EXPAND_SZ
+            if kind not in (winreg.REG_SZ, winreg.REG_EXPAND_SZ):
+                raise Failure("PATH_CONFLICT", "The user Path registry value is not text.")
+            def normalize(value):
+                return os.path.normcase(os.path.normpath(os.path.expandvars(value.strip('"'))))
+            parts = [p for p in old.split(";") if p and normalize(p) != normalize(binary)]
+            updated = ";".join([binary, *parts])
+            if old != updated:
+                winreg.SetValueEx(key, "Path", 0, kind, updated)
+        # Notify Explorer. Existing terminals still retain their own environment.
+        try:
+            import ctypes
+            from ctypes import wintypes
+            notify = ctypes.windll.user32.SendMessageTimeoutW
+            notify.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM,
+                               ctypes.c_wchar_p, wintypes.UINT, wintypes.UINT,
+                               ctypes.POINTER(ctypes.c_size_t)]
+            notify.restype = ctypes.c_ssize_t
+            result = ctypes.c_size_t()
+            notify(0xFFFF, 0x1A, 0, "Environment", 2, 3000, ctypes.byref(result))
+        except (OSError, AttributeError):
+            pass
+        ready = any(normalize(p) == normalize(binary)
+                    for p in os.environ.get("PATH", "").split(os.pathsep) if p)
+        return {"command": "aos", "cli": str(cli), "user_path": binary,
+                "restart_terminal_required": not ready}
+
+    home = Path.home()
+    binary = home/".local/bin"
+    entry = binary/"aos"
+    profiles = []
+    ready = any(Path(p).expanduser().resolve() == binary.resolve()
+                for p in os.environ.get("PATH", "").split(os.pathsep) if p)
+    with lock(home/".local/share/aos-command", "register"):
+        if entry.exists() or entry.is_symlink():
+            owned = entry.is_symlink() and entry.resolve() == cli
+            if entry.is_symlink() and not owned:
+                target = entry.resolve()
+                try:
+                    previous = state(target.parent.parent, check_components=False)
+                    owned = Path(previous["cli"]).resolve() == target
+                except (Failure, OSError, ValueError, KeyError):
+                    pass
+            if not owned:
+                raise Failure("PATH_CONFLICT", f"Existing command is not managed by AOS: {entry}")
+        if not ready:
+            shell = Path(os.environ.get("SHELL", "/bin/sh")).name
+            block = ('# AOS user command\n'
+                     'case ":$PATH:" in\n'
+                     '  *":$HOME/.local/bin:"*) ;;\n'
+                     '  *) export PATH="$HOME/.local/bin:$PATH" ;;\n'
+                     'esac\n')
+            if shell == "zsh":
+                profiles = [Path(os.environ.get("ZDOTDIR", home))/".zshrc"]
+            elif shell == "bash":
+                login = next((home/name for name in (".bash_profile", ".bash_login", ".profile")
+                              if (home/name).exists()), home/".profile")
+                profiles = [home/".bashrc", login]
+            elif shell in ("sh", "dash", "ksh"):
+                profiles = [home/".profile"]
+            elif shell == "fish":
+                profiles = [Path(os.environ.get("XDG_CONFIG_HOME", home/".config"))/"fish/conf.d/aos.fish"]
+                block = ('# AOS user command\n'
+                         'if not contains -- "$HOME/.local/bin" $PATH\n'
+                         '    set -gx PATH "$HOME/.local/bin" $PATH\nend\n')
+            else:
+                raise Failure("UNSUPPORTED_SHELL", "Use --no-path and the returned absolute CLI path.")
+            for profile in profiles:
+                append_path_profile(profile, block)
+        binary.mkdir(parents=True, exist_ok=True)
+        stage = binary/(".aos-"+uuid.uuid4().hex)
+        try:
+            stage.symlink_to(cli)
+            os.replace(stage, entry)
+        finally:
+            stage.unlink(missing_ok=True)
+    return {"command": "aos", "cli": str(entry), "user_path": str(binary),
+            "profiles": list(map(str, profiles)), "restart_terminal_required": not ready}
+
+
 def skill_preflight(agents):
     roots = {"codex": Path.home()/".agents/skills",
              "claude": Path.home()/".claude/skills",
@@ -803,7 +907,7 @@ def update_apply(prefix, current, request):
         setup = manager.parent/("setup.ps1" if os.name == "nt" else "setup.sh")
         command = (["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", setup]
                    if os.name == "nt" else ["sh", setup])
-        output = run([*command, "--prefix", prefix, "--non-interactive", "--json"], timeout=900)
+        output = run([*command, "--prefix", prefix, "--non-interactive", "--json", "--no-path"], timeout=900)
         result = json.loads(output)
         if result.get("ok") is not True:
             raise Failure("UPDATE_FAILED", "New installer did not report success.")
@@ -923,6 +1027,8 @@ def main():
     parser.add_argument("--agent", action="append", choices=["codex", "claude", "trae"], default=[])
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--non-interactive", action="store_true")
+    parser.add_argument("--no-path", action="store_true",
+                        help="Skip user command registration and shell/Path changes.")
     parser.add_argument("--request", type=Path)
     arguments, tail = parser.parse_known_args()
     prefix = arguments.prefix.expanduser().resolve()
@@ -931,7 +1037,7 @@ def main():
             if tail:
                 raise Failure("INVALID_INPUT", "Unknown installer arguments: " + " ".join(tail), exit_code=2)
             if (PLUGIN/"plugin.json").is_file() and read_json(PLUGIN/"plugin.json").get("name") == "aos":
-                emit(install(prefix, arguments.uv, archive=arguments.archive, agents=arguments.agent))
+                result = install(prefix, arguments.uv, archive=arguments.archive, agents=arguments.agent)
             else:
                 # Never copy unrelated user skills into the AOS installation.
                 with tempfile.TemporaryDirectory(prefix="aos-skill-") as temp:
@@ -940,8 +1046,11 @@ def main():
                                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc",
                                                                  "installed-prefix.json",
                                                                  ".aos-managed-skill.json"))
-                    emit(install(prefix, arguments.uv, archive=arguments.archive,
-                                 agents=arguments.agent, package_root=root))
+                    result = install(prefix, arguments.uv, archive=arguments.archive,
+                                     agents=arguments.agent, package_root=root)
+            result["command_registration"] = ({"status": "skipped"} if arguments.no_path
+                                              else register_command(result))
+            emit(result)
         elif arguments.mode == "_supervise":
             request = read_json(arguments.request)
             supervise(prefix, request["current"], request["token"], request["instance"])

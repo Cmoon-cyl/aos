@@ -1,10 +1,10 @@
 $ErrorActionPreference = 'Stop'
 $InstallerArgs = @($args)
 if ($InstallerArgs.Count -gt 0 -and $InstallerArgs[0] -eq '--help') {
-    Write-Output 'Install AOS: install.ps1 [--prefix PATH] [--agent codex|claude|trae] [--non-interactive] [--json]'
+    Write-Output 'Install AOS: install.ps1 [--prefix PATH] [--agent codex|claude|trae] [--no-path] [--non-interactive] [--json]'
     return
 }
-$Version = if ($env:AOS_AGENT_VERSION) { $env:AOS_AGENT_VERSION } else { '0.1.0' }
+$Version = if ($env:AOS_AGENT_VERSION) { $env:AOS_AGENT_VERSION } else { '0.1.1' }
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid AOS_AGENT_VERSION' }
 $Temp = Join-Path ([IO.Path]::GetTempPath()) ('aos-install-' + [Guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($Temp) | Out-Null

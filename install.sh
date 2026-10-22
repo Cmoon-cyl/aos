@@ -2,12 +2,12 @@
 # Install the released AOS agent distribution. No Python/Rust/Node.js required.
 set -eu
 umask 077
-version="${AOS_AGENT_VERSION:-0.1.0}"
+version="${AOS_AGENT_VERSION:-0.1.1}"
 if ! printf '%s\n' "$version" | awk '/^[0-9]+\.[0-9]+\.[0-9]+$/ {ok=1} END {exit !ok}'; then
     printf '%s\n' 'Invalid AOS_AGENT_VERSION' >&2; exit 2
 fi
 if [ "$#" -gt 0 ] && [ "$1" = --help ]; then
-    printf '%s\n' 'Install AOS: install.sh [--prefix PATH] [--agent codex|claude|trae] [--non-interactive] [--json]'
+    printf '%s\n' 'Install AOS: install.sh [--prefix PATH] [--agent codex|claude|trae] [--no-path] [--non-interactive] [--json]'
     exit 0
 fi
 temp=$(mktemp -d)

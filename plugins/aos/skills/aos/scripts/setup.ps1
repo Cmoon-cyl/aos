@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $InstallerArgs = @($args)
 $ScriptDirectory = if ($PSScriptRoot) { $PSScriptRoot } else { throw 'Run the saved setup.ps1 file.' }
-$Prefix = if ($env:AOS_HOME) { $env:AOS_HOME } else { Join-Path $env:LOCALAPPDATA 'AOS' }
+$Prefix = if ($env:AOS_HOME) { $env:AOS_HOME } else { Join-Path ([Environment]::GetFolderPath('UserProfile')) '.aos' }
 for ($i = 0; $i -lt $InstallerArgs.Count; $i++) {
     if ($InstallerArgs[$i] -eq '--prefix') {
         if ($i + 1 -ge $InstallerArgs.Count) { throw 'Missing --prefix value' }

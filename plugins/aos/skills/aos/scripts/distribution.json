@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "manager_version": "0.1.0",
+  "manager_version": "0.1.1",
   "repository": "Cmoon-cyl/aos",
   "release_prefix": "aos-agent-v",
   "runtime_version": "0.2.0",
