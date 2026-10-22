@@ -24,6 +24,8 @@ container, or another host.
    with service_response.sum equal to 42. Installation includes a real isolated
    Service call. Authentication errors and missing system prerequisites are
    failures to resolve, not successful installations.
+   Command registration is reported separately in command_registration.status;
+   conflict or failed leaves the verified runtime usable through its absolute cli.
 4. For local discovery and calls, run the returned CLI with env ensure. This
    starts or reuses an owned loopback Router. For an existing remote deployment,
    use the user's supplied connection configuration instead.

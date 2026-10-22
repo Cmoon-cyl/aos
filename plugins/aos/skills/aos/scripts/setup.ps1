@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+# Prefer this PowerShell runtime's modules when launched from another version.
+$env:PSModulePath = (Join-Path $PSHOME 'Modules') + [IO.Path]::PathSeparator + $env:PSModulePath
 $InstallerArgs = @($args)
 $ScriptDirectory = if ($PSScriptRoot) { $PSScriptRoot } else { throw 'Run the saved setup.ps1 file.' }
 $Prefix = if ($env:AOS_HOME) { $env:AOS_HOME } else { Join-Path ([Environment]::GetFolderPath('UserProfile')) '.aos' }

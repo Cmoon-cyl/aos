@@ -1,6 +1,7 @@
 """Installer transaction and archive tests; no network or native build needed."""
 
 import hashlib
+from contextlib import redirect_stdout
 import importlib.util
 import io
 import json
@@ -273,6 +274,34 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((home/".local/bin/aos").resolve(), Path(second["cli"]).resolve())
         self.assertFalse(result["restart_terminal_required"])
         self.assertEqual(result["profiles"], [])
+
+    @unittest.skipIf(os.name == "nt", "POSIX user launcher")
+    def test_owned_dangling_command_can_be_registered_again(self):
+        first = self.install()
+        home = self.root/"home"
+        with patch.object(manager.Path, "home", return_value=home), \
+                patch.dict(os.environ, {"PATH": str(home/".local/bin")}):
+            manager.register_command(first)
+            shutil.rmtree(self.prefix)
+            self.prefix = self.root/"new install"
+            second = self.install()
+            result = manager.register_command(second)
+        self.assertEqual(result["status"], "registered")
+        self.assertEqual((home/".local/bin/aos").resolve(), Path(second["cli"]).resolve())
+
+    def test_registration_failure_retains_verified_runtime_result(self):
+        installed = self.install()
+        output = io.StringIO()
+        with patch.object(manager, "install", return_value=installed), \
+                patch.object(manager, "register_command", side_effect=manager.Failure("PATH_CONFLICT", "user command")), \
+                patch.object(sys, "argv", ["manager", "install", "--prefix", str(self.prefix)]), \
+                redirect_stdout(output):
+            manager.main()
+        result = json.loads(output.getvalue())
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["data"]["verification"], PASSED)
+        self.assertEqual(result["data"]["cli"], installed["cli"])
+        self.assertEqual(result["data"]["command_registration"]["status"], "conflict")
 
 
 class ArchiveTests(unittest.TestCase):

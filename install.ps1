@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+# Prefer this PowerShell runtime's modules when launched from another version.
+$env:PSModulePath = (Join-Path $PSHOME 'Modules') + [IO.Path]::PathSeparator + $env:PSModulePath
 $InstallerArgs = @($args)
 if ($InstallerArgs.Count -gt 0 -and $InstallerArgs[0] -eq '--help') {
     Write-Output 'Install AOS: install.ps1 [--prefix PATH] [--agent codex|claude|trae] [--no-path] [--non-interactive] [--json]'

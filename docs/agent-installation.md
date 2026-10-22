@@ -45,11 +45,14 @@ v14 x64 Runtime 后重试。不会自动申请管理员权限或更改系统级�
 
 默认注册用户级 `aos` 命令。macOS / Linux 在 `~/.local/bin/aos` 建立入口，
 必要时向当前 shell 的用户启动文件追加带标记的 PATH 配置；支持 bash、zsh、sh 和 fish。
-已有非 AOS 管理的同名入口会报冲突。Windows 将安装目录的 `bin` 加入用户 PATH；
+已有非 AOS 管理的同名入口会保留，并在注册结果中报告冲突。Windows 将安装目录的 `bin` 加入用户 PATH；
 `aos.cmd` 是入口文件名，日常输入 `aos` 即可。
 当 `data.command_registration.restart_terminal_required` 为 `true` 时，重新打开终端应用
 后使用短命令；当前终端继续使用 `data.cli`。`--no-path` 适用于隔离安装和自动化测试。
 更新和回滚沿用已注册的入口，不再修改 PATH。
+`data.command_registration.status` 为 `registered` 表示已配置入口，`skipped` 表示按
+`--no-path` 跳过；`conflict` 或 `failed` 表示短命令注册未完成，原因在同一字段内。
+注册失败不撤销已验证的运行时，此时使用 `data.cli` 继续工作。
 
 成功需同时满足 `ok: true`、`data.verification.status: "passed"`，
 以及 `data.verification.service_response.sum: 42`。验证会临时启动独立的

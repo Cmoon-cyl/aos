@@ -566,7 +566,7 @@ def register_command(current):
             pass
         ready = any(normalize(p) == normalize(binary)
                     for p in os.environ.get("PATH", "").split(os.pathsep) if p)
-        return {"command": "aos", "cli": str(cli), "user_path": binary,
+        return {"status": "registered", "command": "aos", "cli": str(cli), "user_path": binary,
                 "restart_terminal_required": not ready}
 
     home = Path.home()
@@ -575,9 +575,13 @@ def register_command(current):
     profiles = []
     ready = any(Path(p).expanduser().resolve() == binary.resolve()
                 for p in os.environ.get("PATH", "").split(os.pathsep) if p)
-    with lock(home/".local/share/aos-command", "register"):
+    registration = home/".local/share/aos-command"
+    with lock(registration, "register"):
+        marker = registration/"registration.json"
         if entry.exists() or entry.is_symlink():
             owned = entry.is_symlink() and entry.resolve() == cli
+            if entry.is_symlink() and not owned and marker.is_file():
+                owned = read_json(marker).get("cli") == str(entry.resolve())
             if entry.is_symlink() and not owned:
                 target = entry.resolve()
                 try:
@@ -616,9 +620,10 @@ def register_command(current):
         try:
             stage.symlink_to(cli)
             os.replace(stage, entry)
+            write_json(marker, {"cli": str(cli)})
         finally:
             stage.unlink(missing_ok=True)
-    return {"command": "aos", "cli": str(entry), "user_path": str(binary),
+    return {"status": "registered", "command": "aos", "cli": str(entry), "user_path": str(binary),
             "profiles": list(map(str, profiles)), "restart_terminal_required": not ready}
 
 
@@ -1048,8 +1053,16 @@ def main():
                                                                  ".aos-managed-skill.json"))
                     result = install(prefix, arguments.uv, archive=arguments.archive,
                                      agents=arguments.agent, package_root=root)
-            result["command_registration"] = ({"status": "skipped"} if arguments.no_path
-                                              else register_command(result))
+            if arguments.no_path:
+                registration = {"status": "skipped"}
+            else:
+                try:
+                    registration = register_command(result)
+                except (Failure, OSError, ValueError) as error:
+                    code = getattr(error, "code", "PATH_REGISTRATION_FAILED")
+                    registration = {"status": "conflict" if code.endswith("CONFLICT") else "failed",
+                                    "code": code, "message": str(error), "cli": result["cli"]}
+            result["command_registration"] = registration
             emit(result)
         elif arguments.mode == "_supervise":
             request = read_json(arguments.request)
