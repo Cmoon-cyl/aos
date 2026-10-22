@@ -1,5 +1,9 @@
 # CLI：发现能力与提交 JSON 请求
 
+一键安装返回的 CLI 入口还提供环境管理和更新命令，见
+[一键安装与维护](agent-installation.md)。下文描述平台包内的原生业务命令；
+安装管理器将这些命令原样转发给原生 CLI。
+
 `aos` 是与 Python SDK 共用 Rust core 的原生命令行程序。
 macOS/Linux 使用 `bin/aos`，Windows 使用 `bin/aos.exe`。
 以下 `aos` 指所安装包中的可执行文件。

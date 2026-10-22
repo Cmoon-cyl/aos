@@ -1,0 +1,15 @@
+{
+  "name": "aos",
+  "version": "0.1.0",
+  "description": "Install, update, and use AOS services and Python nodes.",
+  "author": {
+    "name": "Cmoon-cyl"
+  },
+  "skills": "./skills/",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/aos-setup/SKILL.md"
+    }
+  },
+  "license": "Apache-2.0"
+}

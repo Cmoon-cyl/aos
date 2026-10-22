@@ -21,6 +21,7 @@ SDK 的安装验证应使用新 venv 中的 wheel，并在源码树外运行，�
 
 | 工具 | 用途 |
 | --- | --- |
+| scripts/test_agent_installation.py | 安装与回滚事务、归档校验、公开插件打包和更新引导 |
 | `scripts/native_acceptance.py` | 原生构建、Rust 测试、wheel 隔离安装及实际业务检查 |
 | `scripts/platform_probe.py` | 安装后的独立进程 Topic、Service、Action 与 provider 重启检查 |
 | `scripts/platform_security_probe.py` | TLS/ACL、本机与两台主机分别运行的安全通信检查 |

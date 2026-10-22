@@ -5,10 +5,12 @@ AOS 通过 Topic、Service 和 Action 连接不同机器上的程序与 Agent。
 
 ## 第一次使用
 
-1. [安装平台包](install.md)：选择系统和架构，校验 SHA256，安装 Python wheel。
+1. [一键安装](agent-installation.md)：准备完整环境并验证真实请求；也可[手动安装平台包](install.md)。
 2. [运行第一个应用](getting-started.md)：启动 Router 和 provider，调用 Service，体验 Action。
 3. [理解核心概念](concepts.md)：Node、Interface、发现、三种通信方式和状态含义。
 4. [挑选一个示例](examples.md)：消息、任务、生命周期或带持久化的 MemoryServer。
+
+Agent 从[安装与使用入口](for-agents.md)开始；客户端插件见[插件说明](../plugins/aos/README.md)。
 
 ## 开发应用
 

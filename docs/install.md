@@ -1,5 +1,8 @@
 # 安装 AOS
 
+推荐使用[一键安装](agent-installation.md)，自动准备独立 Python、SDK、CLI 和 Router。
+Agent 可从[专用入口](for-agents.md)开始。下文介绍自行管理 Python 的手动平台包安装。
+
 使用完整平台包需要匹配架构的 **CPython 3.11**，不需要本机编译 Rust。
 Windows 还需要 [Microsoft Visual C++ v14 x64 运行库](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)。
 原生 CLI、SDK 扩展、官方 Router 及其插件依赖 `VCRUNTIME140.dll`；请安装微软提供的 x64 运行库后，再执行下方命令。
