@@ -23,7 +23,9 @@ installed contract. `node_name` and `endpoint_name` are absolute exact names;
 `subscription`, `client` or `action_client`. Hidden/control endpoints and clients
 are excluded by default; request `include_internal` / `include_clients` when
 needed. A kind selector can explicitly select clients. Ephemeral root names
-`/aos_cli_<32 hex digits>` are hidden by default; `include_cli_nodes:true` or an
+`/aos_cli_<32 hex digits>` are hidden by default only when they have no selected
+endpoints. Real publishers/subscriptions from `topic pub` / `topic echo` remain
+visible. `include_cli_nodes:true` or an
 exact `node_name` selector includes them. This naming convention is not proof
 of identity.
 

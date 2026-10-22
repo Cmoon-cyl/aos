@@ -33,7 +33,7 @@ pub fn request_fields(verb: &str) -> Value {
             "description":"Include hidden paths and recognized AOS control endpoints."},
         "include_clients":{"type":"boolean","default":false},
         "include_cli_nodes":{"type":"boolean","default":false,
-            "description":"Include root /aos_cli_<32 hex digits> ephemeral CLI names. Exact node_name selectors also include them. This is a naming convention, not authenticated identity."},
+            "description":"Include root /aos_cli_<32 hex digits> nodes even when they have no selected endpoints. Exact node_name selectors also include them. This is a naming convention, not authenticated identity."},
         "max_nodes":{"type":"integer","minimum":1,"maximum":4096,"default":256},
         "max_endpoints":{"type":"integer","minimum":1,"maximum":32768,"default":4096}
     });
@@ -145,8 +145,7 @@ impl Options {
     }
 
     fn node_matches(&self, node: &ObservedNode) -> bool {
-        (self.cli_nodes || self.node.is_some() || !cli_name(&node.name))
-            && self.node.as_ref().is_none_or(|name| name == &node.name)
+        self.node.as_ref().is_none_or(|name| name == &node.name)
             && self.namespace.as_ref().is_none_or(|namespace| {
                 let namespace = namespace.trim_end_matches('/');
                 node.namespace == namespace || node.namespace.starts_with(&format!("{namespace}/"))
@@ -370,7 +369,11 @@ fn selected<'a>(
             .iter()
             .filter(|entity| options.endpoint_matches(entity))
             .count();
-        if count == 0 && (options.endpoint.is_some() || options.kind.is_some()) {
+        if count == 0
+            && (options.endpoint.is_some()
+                || options.kind.is_some()
+                || (!options.cli_nodes && options.node.is_none() && cli_name(&node.name)))
+        {
             continue;
         }
         endpoints += count;

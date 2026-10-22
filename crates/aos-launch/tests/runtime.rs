@@ -251,19 +251,35 @@ fn observe_owned_birth(pid: u32) -> Option<BirthTime> {
         {
             use nix::libc;
             // macOS PROC_PIDTBSDINFO omits zombies. A spawn failure can send
-            // SIGINT before the queued ProcessStarted reaches this sink.
-            // Observe that exact exited child without consuming its status.
-            let mut information = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
-            let result = unsafe {
-                libc::waitid(
-                    libc::P_PID,
-                    pid,
-                    &mut information,
-                    libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
-                )
-            };
-            assert_eq!(result, 0, "{}", io::Error::last_os_error());
-            assert_eq!(information.si_pid as u32, pid);
+            // SIGINT before the queued ProcessStarted reaches this sink. The
+            // kernel can hide PROC_PIDTBSDINFO before WEXITED becomes ready.
+            // Wait boundedly for identity or that exact exited child, without
+            // consuming its status or relaxing the final reap assertion.
+            let deadline = Instant::now() + Duration::from_secs(1);
+            loop {
+                if let Some(birth) = process_birth(pid) {
+                    return Some(birth);
+                }
+                let mut information = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
+                let result = unsafe {
+                    libc::waitid(
+                        libc::P_PID,
+                        pid,
+                        &mut information,
+                        libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+                    )
+                };
+                assert_eq!(result, 0, "{}", io::Error::last_os_error());
+                if information.si_pid as u32 == pid {
+                    break;
+                }
+                assert_eq!(information.si_pid, 0);
+                assert!(
+                    Instant::now() < deadline,
+                    "owned child never became observable: {pid}"
+                );
+                std::thread::sleep(Duration::from_millis(1));
+            }
             // Without a birth time assert_reaped conservatively requires
             // ECHILD; it cannot excuse a still-waitable PID as a reuse.
         }

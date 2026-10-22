@@ -27,8 +27,9 @@ aos graph snapshot
 
 默认不展开完整 Interface schema，也不输出参数值和进程环境。隐藏路径、已识别的内部
 控制接口、Client 和 ActionClient 默认不列出，诊断时可显式开启。
-根命名空间中符合 `/aos_cli_<32 位十六进制>` 的临时 CLI 节点也默认隐藏，避免每次调用
-产生无关变化；`include_cli_nodes:true` 或精确 `node_name` 选择可查看。这只是命名约定，
+根命名空间中符合 `/aos_cli_<32 位十六进制>` 且没有选中端点的临时 CLI 节点默认隐藏，
+避免每次调用产生无关变化；`topic pub` 等创建的可见端点仍保留。
+`include_cli_nodes:true` 或精确 `node_name` 选择可查看空节点。这只是命名约定，
 不能作为身份认证。
 
 例如只查归属于 `/fleet` 下节点的 Service，把以下内容保存为 `discovery.json`：

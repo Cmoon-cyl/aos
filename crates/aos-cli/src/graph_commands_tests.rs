@@ -254,3 +254,36 @@ fn endpoint_only_owners_are_explicit_and_cli_noise_can_be_requested() {
         1
     );
 }
+
+#[test]
+fn cli_publishers_and_subscriptions_remain_discoverable() {
+    let owner = node("cli", "aos_cli_0123456789abcdef0123456789abcdef", "/");
+    for kind in [EntityKind::Publisher, EntityKind::Subscription] {
+        let mut endpoint = service(&owner, "endpoint", "/chatter", "hash");
+        endpoint.kind = kind;
+        let nodes = observe(vec![owner.clone(), endpoint]);
+        for request in [
+            json!({}),
+            json!({"endpoint_name":"/chatter","kind":kind_name(kind)}),
+        ] {
+            let view = project(&nodes, &BTreeMap::new(), &options(request)).unwrap();
+            assert_eq!(view["cli"]["endpoints"][0]["name"], "/chatter");
+        }
+    }
+    let mut client = service(&owner, "client", "/work", "hash");
+    client.kind = EntityKind::Client;
+    let nodes = observe(vec![owner, client]);
+    assert!(project(&nodes, &BTreeMap::new(), &options(json!({})))
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        project(
+            &nodes,
+            &BTreeMap::new(),
+            &options(json!({"include_clients":true}))
+        )
+        .unwrap()
+        .len(),
+        1
+    );
+}

@@ -284,6 +284,7 @@ fn graph_cli_converges_across_routers_without_calling_business_services() {
         })
     });
     assert_eq!(watch.view[&id]["endpoints"][0]["side_effects"], "read_only");
+    assert_eq!(watch.view[&id]["metadata_sanitized"], false);
     assert!(watch.view[&id]["endpoints"]
         .as_array()
         .unwrap()
@@ -291,17 +292,24 @@ fn graph_cli_converges_across_routers_without_calling_business_services() {
         .all(|e| e["name"] != "/fleet/worker/get_node_card"));
 
     // Only lifecycle state changes; no Graph declaration changes.
-    owner
+    let mut transition = owner
         .lifecycle()
         .unwrap()
         .begin_transition(LifecycleTransitionId::Configure)
-        .unwrap()
+        .unwrap();
+    watch.until(|view| {
+        view.get(&id)
+            .is_some_and(|node| node["lifecycle"]["transitioning"] == true)
+    });
+    assert_eq!(watch.view[&id]["metadata_sanitized"], false);
+    transition
         .complete(LifecycleCallbackReturn::Success, Some(Duration::ZERO))
         .unwrap();
     watch.until(|view| {
         view.get(&id)
             .is_some_and(|node| node["lifecycle"]["current_state"]["label"] == "inactive")
     });
+    assert_eq!(watch.view[&id]["metadata_sanitized"], false);
     assert!(
         watch
             .receiver
@@ -312,7 +320,7 @@ fn graph_cli_converges_across_routers_without_calling_business_services() {
 
     let mut late = network.spawn(
         "wait",
-        json!({"endpoint_name":"/fleet/second","kind":"service","timeout":5,"settle_time":0.1}),
+        json!({"endpoint_name":"/fleet/second","kind":"service","timeout":5,"settle_time":0.1,"refresh_interval":0.15}),
     );
     assert!(late
         .receiver
