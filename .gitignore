@@ -1,0 +1,24 @@
+/target/
+/dist/
+/.venv*/
+/.tools/
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+.DS_Store
+
+# Local development records and generated reports stay outside releases.
+/docs/evidence/
+/docs/platform/evidence/
+/evidence/
+/work/
+/artifacts/
+/test-results/
+/coverage/
+/.remember/
+/.codex/
+/.agents/
+/.env
+/.env.*
+!/.env.example

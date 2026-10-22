@@ -1,0 +1,4 @@
+# Preserve the published third-party bytes, including upstream whitespace.
+vendor/zenoh/** -text -whitespace linguist-vendored=true
+# Unified diff context lines must retain their leading context marker.
+upstream/patches/*.patch -text -whitespace

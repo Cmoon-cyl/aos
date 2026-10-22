@@ -1,0 +1,33 @@
+[workspace]
+members = ["crates/aos-bag", "crates/aos-core", "crates/aos-zenoh", "crates/aos-py", "crates/aos-cli", "crates/aos-launch"]
+exclude = ["vendor/zenoh", "vendor/zenoh-link-tls"]
+resolver = "2"
+
+[workspace.package]
+version = "0.2.0"
+edition = "2021"
+rust-version = "1.99.1"
+repository = "https://github.com/Cmoon-cyl/aos"
+license = "Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+aos-bag = { path = "crates/aos-bag" }
+mcap = { version = "=0.26.0", default-features = false }
+aos-core = { path = "crates/aos-core" }
+aos-zenoh = { path = "crates/aos-zenoh" }
+aos-launch = { path = "crates/aos-launch" }
+pyo3 = { version = "=0.30.1", features = ["abi3-py311"] }
+zenoh = { version = "=1.10.1", default-features = false, features = ["transport_tcp", "transport_tls", "unstable"] }
+zenoh-link-tls = { version = "=1.10.1", default-features = false }
+zenoh-ext = { version = "=1.10.1", default-features = false, features = ["unstable"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_jcs = "=0.2.0"
+jsonschema = { version = "=0.59.0", default-features = false }
+sha2 = "0.10"
+uuid = { version = "=1.28.0", features = ["v4", "serde"] }
+
+[patch.crates-io]
+zenoh = { path = "vendor/zenoh" }
+zenoh-link-tls = { path = "vendor/zenoh-link-tls" }

@@ -1,0 +1,2996 @@
+diff --git a/vendor/zenoh/AOS-PATCH.md b/vendor/zenoh/AOS-PATCH.md
+new file mode 100644
+index 0000000..b3c2542
+--- /dev/null
++++ b/vendor/zenoh/AOS-PATCH.md
+@@ -0,0 +1,38 @@
++# AOS local modification of Zenoh 1.10.1
++
++This directory contains the published `zenoh` 1.10.1 crate, with a local
++liveliness history and routing declaration ordering fixes. Other Zenoh crates remain registry dependencies
++at version 1.10.1. The workspace selects this directory using
++`[patch.crates-io]`; no global Cargo cache is modified.
++
++- Upstream commit: `1211779c3647f5a96713dade452c546a07823580`
++- Published crate SHA-256:
++  `453ba5d28a1197653aae4bb024fd74a9d5c7051d5a19a77f3a43d83f40c22584`
++- Upstream license: EPL-2.0 OR Apache-2.0; AOS selects Apache-2.0.
++- `LICENSE` and `NOTICE.md` are copied byte-for-byte from that upstream commit.
++  Existing source copyright and license headers are retained.
++- Modified API files: `src/api/mod.rs`, `src/api/session.rs`,
++  `src/api/subscriber.rs`.
++- Modified routing files: `src/net/primitives/demux.rs`,
++  `src/net/routing/dispatcher/{face,interests,mod,tables}.rs`,
++  `src/net/routing/gateway.rs`, and
++  `src/net/routing/hat/router/{mod,pubsub,queries,token}.rs`.
++- New implementations: `src/api/liveliness_history.rs` and
++  `src/net/routing/dispatcher/declare_outbox.rs`.
++- Added distribution files: this `AOS-PATCH.md`, `LICENSE`, and `NOTICE.md`.
++- `Session::AOS_LIVELINESS_HISTORY_PATCH_VERSION` is a hidden compile-time
++  re-export of the routing-core marker in `dispatcher/tables.rs`, required by
++  aos-zenoh. Version 2 covers both ordering fixes; a missing or history-only
++  local tree is a build error. Exact source replay, not the version alone,
++  detects partial or arbitrary source changes.
++
++The behavior, limitations, source comparison and verification commands are
++documented in `../../upstream/zenoh-history-gate.md` and
++`../../upstream/zenoh-routing-order.md`. The unified source patch is
++`../../upstream/patches/zenoh-1.10.1-liveliness-history.patch`.
++`../../upstream/zenoh-1.10.1-vendor-manifest.json` records the original and final
++file hashes. Run `python3 scripts/check_zenoh_vendor.py --archive
++/path/to/zenoh-1.10.1.crate` from the AOS root to verify the fixed change set
++and reproduce all vendor bytes, including these notice/license files, by
++applying the complete patch to the original archive. The native acceptance
++harness requires this check before building.
+diff --git a/vendor/zenoh/LICENSE b/vendor/zenoh/LICENSE
+new file mode 100644
+index 0000000..8c3fbf6
+--- /dev/null
++++ b/vendor/zenoh/LICENSE
+@@ -0,0 +1,459 @@
++apache-2.0
++epl-2.0
++
++
++                                 Apache License
++                           Version 2.0, January 2004
++                        http://www.apache.org/licenses/
++
++   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
++
++   1. Definitions.
++
++      "License" shall mean the terms and conditions for use, reproduction,
++      and distribution as defined by Sections 1 through 9 of this document.
++
++      "Licensor" shall mean the copyright owner or entity authorized by
++      the copyright owner that is granting the License.
++
++      "Legal Entity" shall mean the union of the acting entity and all
++      other entities that control, are controlled by, or are under common
++      control with that entity. For the purposes of this definition,
++      "control" means (i) the power, direct or indirect, to cause the
++      direction or management of such entity, whether by contract or
++      otherwise, or (ii) ownership of fifty percent (50%) or more of the
++      outstanding shares, or (iii) beneficial ownership of such entity.
++
++      "You" (or "Your") shall mean an individual or Legal Entity
++      exercising permissions granted by this License.
++
++      "Source" form shall mean the preferred form for making modifications,
++      including but not limited to software source code, documentation
++      source, and configuration files.
++
++      "Object" form shall mean any form resulting from mechanical
++      transformation or translation of a Source form, including but
++      not limited to compiled object code, generated documentation,
++      and conversions to other media types.
++
++      "Work" shall mean the work of authorship, whether in Source or
++      Object form, made available under the License, as indicated by a
++      copyright notice that is included in or attached to the work
++      (an example is provided in the Appendix below).
++
++      "Derivative Works" shall mean any work, whether in Source or Object
++      form, that is based on (or derived from) the Work and for which the
++      editorial revisions, annotations, elaborations, or other modifications
++      represent, as a whole, an original work of authorship. For the purposes
++      of this License, Derivative Works shall not include works that remain
++      separable from, or merely link (or bind by name) to the interfaces of,
++      the Work and Derivative Works thereof.
++
++      "Contribution" shall mean any work of authorship, including
++      the original version of the Work and any modifications or additions
++      to that Work or Derivative Works thereof, that is intentionally
++      submitted to Licensor for inclusion in the Work by the copyright owner
++      or by an individual or Legal Entity authorized to submit on behalf of
++      the copyright owner. For the purposes of this definition, "submitted"
++      means any form of electronic, verbal, or written communication sent
++      to the Licensor or its representatives, including but not limited to
++      communication on electronic mailing lists, source code control systems,
++      and issue tracking systems that are managed by, or on behalf of, the
++      Licensor for the purpose of discussing and improving the Work, but
++      excluding communication that is conspicuously marked or otherwise
++      designated in writing by the copyright owner as "Not a Contribution."
++
++      "Contributor" shall mean Licensor and any individual or Legal Entity
++      on behalf of whom a Contribution has been received by Licensor and
++      subsequently incorporated within the Work.
++
++   2. Grant of Copyright License. Subject to the terms and conditions of
++      this License, each Contributor hereby grants to You a perpetual,
++      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
++      copyright license to reproduce, prepare Derivative Works of,
++      publicly display, publicly perform, sublicense, and distribute the
++      Work and such Derivative Works in Source or Object form.
++
++   3. Grant of Patent License. Subject to the terms and conditions of
++      this License, each Contributor hereby grants to You a perpetual,
++      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
++      (except as stated in this section) patent license to make, have made,
++      use, offer to sell, sell, import, and otherwise transfer the Work,
++      where such license applies only to those patent claims licensable
++      by such Contributor that are necessarily infringed by their
++      Contribution(s) alone or by combination of their Contribution(s)
++      with the Work to which such Contribution(s) was submitted. If You
++      institute patent litigation against any entity (including a
++      cross-claim or counterclaim in a lawsuit) alleging that the Work
++      or a Contribution incorporated within the Work constitutes direct
++      or contributory patent infringement, then any patent licenses
++      granted to You under this License for that Work shall terminate
++      as of the date such litigation is filed.
++
++   4. Redistribution. You may reproduce and distribute copies of the
++      Work or Derivative Works thereof in any medium, with or without
++      modifications, and in Source or Object form, provided that You
++      meet the following conditions:
++
++      (a) You must give any other recipients of the Work or
++          Derivative Works a copy of this License; and
++
++      (b) You must cause any modified files to carry prominent notices
++          stating that You changed the files; and
++
++      (c) You must retain, in the Source form of any Derivative Works
++          that You distribute, all copyright, patent, trademark, and
++          attribution notices from the Source form of the Work,
++          excluding those notices that do not pertain to any part of
++          the Derivative Works; and
++
++      (d) If the Work includes a "NOTICE" text file as part of its
++          distribution, then any Derivative Works that You distribute must
++          include a readable copy of the attribution notices contained
++          within such NOTICE file, excluding those notices that do not
++          pertain to any part of the Derivative Works, in at least one
++          of the following places: within a NOTICE text file distributed
++          as part of the Derivative Works; within the Source form or
++          documentation, if provided along with the Derivative Works; or,
++          within a display generated by the Derivative Works, if and
++          wherever such third-party notices normally appear. The contents
++          of the NOTICE file are for informational purposes only and
++          do not modify the License. You may add Your own attribution
++          notices within Derivative Works that You distribute, alongside
++          or as an addendum to the NOTICE text from the Work, provided
++          that such additional attribution notices cannot be construed
++          as modifying the License.
++
++      You may add Your own copyright statement to Your modifications and
++      may provide additional or different license terms and conditions
++      for use, reproduction, or distribution of Your modifications, or
++      for any such Derivative Works as a whole, provided Your use,
++      reproduction, and distribution of the Work otherwise complies with
++      the conditions stated in this License.
++
++   5. Submission of Contributions. Unless You explicitly state otherwise,
++      any Contribution intentionally submitted for inclusion in the Work
++      by You to the Licensor shall be under the terms and conditions of
++      this License, without any additional terms or conditions.
++      Notwithstanding the above, nothing herein shall supersede or modify
++      the terms of any separate license agreement you may have executed
++      with Licensor regarding such Contributions.
++
++   6. Trademarks. This License does not grant permission to use the trade
++      names, trademarks, service marks, or product names of the Licensor,
++      except as required for reasonable and customary use in describing the
++      origin of the Work and reproducing the content of the NOTICE file.
++
++   7. Disclaimer of Warranty. Unless required by applicable law or
++      agreed to in writing, Licensor provides the Work (and each
++      Contributor provides its Contributions) on an "AS IS" BASIS,
++      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
++      implied, including, without limitation, any warranties or conditions
++      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
++      PARTICULAR PURPOSE. You are solely responsible for determining the
++      appropriateness of using or redistributing the Work and assume any
++      risks associated with Your exercise of permissions under this License.
++
++   8. Limitation of Liability. In no event and under no legal theory,
++      whether in tort (including negligence), contract, or otherwise,
++      unless required by applicable law (such as deliberate and grossly
++      negligent acts) or agreed to in writing, shall any Contributor be
++      liable to You for damages, including any direct, indirect, special,
++      incidental, or consequential damages of any character arising as a
++      result of this License or out of the use or inability to use the
++      Work (including but not limited to damages for loss of goodwill,
++      work stoppage, computer failure or malfunction, or any and all
++      other commercial damages or losses), even if such Contributor
++      has been advised of the possibility of such damages.
++
++   9. Accepting Warranty or Additional Liability. While redistributing
++      the Work or Derivative Works thereof, You may choose to offer,
++      and charge a fee for, acceptance of support, warranty, indemnity,
++      or other liability obligations and/or rights consistent with this
++      License. However, in accepting such obligations, You may act only
++      on Your own behalf and on Your sole responsibility, not on behalf
++      of any other Contributor, and only if You agree to indemnify,
++      defend, and hold each Contributor harmless for any liability
++      incurred by, or claims asserted against, such Contributor by reason
++      of your accepting any such warranty or additional liability.
++
++    OR
++
++Eclipse Public License - v 2.0
++
++    THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE
++    PUBLIC LICENSE ("AGREEMENT"). ANY USE, REPRODUCTION OR DISTRIBUTION
++    OF THE PROGRAM CONSTITUTES RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT.
++
++1. DEFINITIONS
++
++"Contribution" means:
++
++  a) in the case of the initial Contributor, the initial content
++     Distributed under this Agreement, and
++
++  b) in the case of each subsequent Contributor:
++     i) changes to the Program, and
++     ii) additions to the Program;
++  where such changes and/or additions to the Program originate from
++  and are Distributed by that particular Contributor. A Contribution
++  "originates" from a Contributor if it was added to the Program by
++  such Contributor itself or anyone acting on such Contributor's behalf.
++  Contributions do not include changes or additions to the Program that
++  are not Modified Works.
++
++"Contributor" means any person or entity that Distributes the Program.
++
++"Licensed Patents" mean patent claims licensable by a Contributor which
++are necessarily infringed by the use or sale of its Contribution alone
++or when combined with the Program.
++
++"Program" means the Contributions Distributed in accordance with this
++Agreement.
++
++"Recipient" means anyone who receives the Program under this Agreement
++or any Secondary License (as applicable), including Contributors.
++
++"Derivative Works" shall mean any work, whether in Source Code or other
++form, that is based on (or derived from) the Program and for which the
++editorial revisions, annotations, elaborations, or other modifications
++represent, as a whole, an original work of authorship.
++
++"Modified Works" shall mean any work in Source Code or other form that
++results from an addition to, deletion from, or modification of the
++contents of the Program, including, for purposes of clarity any new file
++in Source Code form that contains any contents of the Program. Modified
++Works shall not include works that contain only declarations,
++interfaces, types, classes, structures, or files of the Program solely
++in each case in order to link to, bind by name, or subclass the Program
++or Modified Works thereof.
++
++"Distribute" means the acts of a) distributing or b) making available
++in any manner that enables the transfer of a copy.
++
++"Source Code" means the form of a Program preferred for making
++modifications, including but not limited to software source code,
++documentation source, and configuration files.
++
++"Secondary License" means either the GNU General Public License,
++Version 2.0, or any later versions of that license, including any
++exceptions or additional permissions as identified by the initial
++Contributor.
++
++2. GRANT OF RIGHTS
++
++  a) Subject to the terms of this Agreement, each Contributor hereby
++  grants Recipient a non-exclusive, worldwide, royalty-free copyright
++  license to reproduce, prepare Derivative Works of, publicly display,
++  publicly perform, Distribute and sublicense the Contribution of such
++  Contributor, if any, and such Derivative Works.
++
++  b) Subject to the terms of this Agreement, each Contributor hereby
++  grants Recipient a non-exclusive, worldwide, royalty-free patent
++  license under Licensed Patents to make, use, sell, offer to sell,
++  import and otherwise transfer the Contribution of such Contributor,
++  if any, in Source Code or other form. This patent license shall
++  apply to the combination of the Contribution and the Program if, at
++  the time the Contribution is added by the Contributor, such addition
++  of the Contribution causes such combination to be covered by the
++  Licensed Patents. The patent license shall not apply to any other
++  combinations which include the Contribution. No hardware per se is
++  licensed hereunder.
++
++  c) Recipient understands that although each Contributor grants the
++  licenses to its Contributions set forth herein, no assurances are
++  provided by any Contributor that the Program does not infringe the
++  patent or other intellectual property rights of any other entity.
++  Each Contributor disclaims any liability to Recipient for claims
++  brought by any other entity based on infringement of intellectual
++  property rights or otherwise. As a condition to exercising the
++  rights and licenses granted hereunder, each Recipient hereby
++  assumes sole responsibility to secure any other intellectual
++  property rights needed, if any. For example, if a third party
++  patent license is required to allow Recipient to Distribute the
++  Program, it is Recipient's responsibility to acquire that license
++  before distributing the Program.
++
++  d) Each Contributor represents that to its knowledge it has
++  sufficient copyright rights in its Contribution, if any, to grant
++  the copyright license set forth in this Agreement.
++
++  e) Notwithstanding the terms of any Secondary License, no
++  Contributor makes additional grants to any Recipient (other than
++  those set forth in this Agreement) as a result of such Recipient's
++  receipt of the Program under the terms of a Secondary License
++  (if permitted under the terms of Section 3).
++
++3. REQUIREMENTS
++
++3.1 If a Contributor Distributes the Program in any form, then:
++
++  a) the Program must also be made available as Source Code, in
++  accordance with section 3.2, and the Contributor must accompany
++  the Program with a statement that the Source Code for the Program
++  is available under this Agreement, and informs Recipients how to
++  obtain it in a reasonable manner on or through a medium customarily
++  used for software exchange; and
++
++  b) the Contributor may Distribute the Program under a license
++  different than this Agreement, provided that such license:
++     i) effectively disclaims on behalf of all other Contributors all
++     warranties and conditions, express and implied, including
++     warranties or conditions of title and non-infringement, and
++     implied warranties or conditions of merchantability and fitness
++     for a particular purpose;
++
++     ii) effectively excludes on behalf of all other Contributors all
++     liability for damages, including direct, indirect, special,
++     incidental and consequential damages, such as lost profits;
++
++     iii) does not attempt to limit or alter the recipients' rights
++     in the Source Code under section 3.2; and
++
++     iv) requires any subsequent distribution of the Program by any
++     party to be under a license that satisfies the requirements
++     of this section 3.
++
++3.2 When the Program is Distributed as Source Code:
++
++  a) it must be made available under this Agreement, or if the
++  Program (i) is combined with other material in a separate file or
++  files made available under a Secondary License, and (ii) the initial
++  Contributor attached to the Source Code the notice described in
++  Exhibit A of this Agreement, then the Program may be made available
++  under the terms of such Secondary Licenses, and
++
++  b) a copy of this Agreement must be included with each copy of
++  the Program.
++
++3.3 Contributors may not remove or alter any copyright, patent,
++trademark, attribution notices, disclaimers of warranty, or limitations
++of liability ("notices") contained within the Program from any copy of
++the Program which they Distribute, provided that Contributors may add
++their own appropriate notices.
++
++4. COMMERCIAL DISTRIBUTION
++
++Commercial distributors of software may accept certain responsibilities
++with respect to end users, business partners and the like. While this
++license is intended to facilitate the commercial use of the Program,
++the Contributor who includes the Program in a commercial product
++offering should do so in a manner which does not create potential
++liability for other Contributors. Therefore, if a Contributor includes
++the Program in a commercial product offering, such Contributor
++("Commercial Contributor") hereby agrees to defend and indemnify every
++other Contributor ("Indemnified Contributor") against any losses,
++damages and costs (collectively "Losses") arising from claims, lawsuits
++and other legal actions brought by a third party against the Indemnified
++Contributor to the extent caused by the acts or omissions of such
++Commercial Contributor in connection with its distribution of the Program
++in a commercial product offering. The obligations in this section do not
++apply to any claims or Losses relating to any actual or alleged
++intellectual property infringement. In order to qualify, an Indemnified
++Contributor must: a) promptly notify the Commercial Contributor in
++writing of such claim, and b) allow the Commercial Contributor to control,
++and cooperate with the Commercial Contributor in, the defense and any
++related settlement negotiations. The Indemnified Contributor may
++participate in any such claim at its own expense.
++
++For example, a Contributor might include the Program in a commercial
++product offering, Product X. That Contributor is then a Commercial
++Contributor. If that Commercial Contributor then makes performance
++claims, or offers warranties related to Product X, those performance
++claims and warranties are such Commercial Contributor's responsibility
++alone. Under this section, the Commercial Contributor would have to
++defend claims against the other Contributors related to those performance
++claims and warranties, and if a court requires any other Contributor to
++pay any damages as a result, the Commercial Contributor must pay
++those damages.
++
++5. NO WARRANTY
++
++EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT
++PERMITTED BY APPLICABLE LAW, THE PROGRAM IS PROVIDED ON AN "AS IS"
++BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR
++IMPLIED INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF
++TITLE, NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR
++PURPOSE. Each Recipient is solely responsible for determining the
++appropriateness of using and distributing the Program and assumes all
++risks associated with its exercise of rights under this Agreement,
++including but not limited to the risks and costs of program errors,
++compliance with applicable laws, damage to or loss of data, programs
++or equipment, and unavailability or interruption of operations.
++
++6. DISCLAIMER OF LIABILITY
++
++EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT
++PERMITTED BY APPLICABLE LAW, NEITHER RECIPIENT NOR ANY CONTRIBUTORS
++SHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING WITHOUT LIMITATION LOST
++PROFITS), HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ARISING IN ANY WAY OUT OF THE USE OR DISTRIBUTION OF THE PROGRAM OR THE
++EXERCISE OF ANY RIGHTS GRANTED HEREUNDER, EVEN IF ADVISED OF THE
++POSSIBILITY OF SUCH DAMAGES.
++
++7. GENERAL
++
++If any provision of this Agreement is invalid or unenforceable under
++applicable law, it shall not affect the validity or enforceability of
++the remainder of the terms of this Agreement, and without further
++action by the parties hereto, such provision shall be reformed to the
++minimum extent necessary to make such provision valid and enforceable.
++
++If Recipient institutes patent litigation against any entity
++(including a cross-claim or counterclaim in a lawsuit) alleging that the
++Program itself (excluding combinations of the Program with other software
++or hardware) infringes such Recipient's patent(s), then such Recipient's
++rights granted under Section 2(b) shall terminate as of the date such
++litigation is filed.
++
++All Recipient's rights under this Agreement shall terminate if it
++fails to comply with any of the material terms or conditions of this
++Agreement and does not cure such failure in a reasonable period of
++time after becoming aware of such noncompliance. If all Recipient's
++rights under this Agreement terminate, Recipient agrees to cease use
++and distribution of the Program as soon as reasonably practicable.
++However, Recipient's obligations under this Agreement and any licenses
++granted by Recipient relating to the Program shall continue and survive.
++
++Everyone is permitted to copy and distribute copies of this Agreement,
++but in order to avoid inconsistency the Agreement is copyrighted and
++may only be modified in the following manner. The Agreement Steward
++reserves the right to publish new versions (including revisions) of
++this Agreement from time to time. No one other than the Agreement
++Steward has the right to modify this Agreement. The Eclipse Foundation
++is the initial Agreement Steward. The Eclipse Foundation may assign the
++responsibility to serve as the Agreement Steward to a suitable separate
++entity. Each new version of the Agreement will be given a distinguishing
++version number. The Program (including Contributions) may always be
++Distributed subject to the version of the Agreement under which it was
++received. In addition, after a new version of the Agreement is published,
++Contributor may elect to Distribute the Program (including its
++Contributions) under the new version.
++
++Except as expressly stated in Sections 2(a) and 2(b) above, Recipient
++receives no rights or licenses to the intellectual property of any
++Contributor under this Agreement, whether expressly, by implication,
++estoppel or otherwise. All rights in the Program not expressly granted
++under this Agreement are reserved. Nothing in this Agreement is intended
++to be enforceable by any entity that is not a Contributor or Recipient.
++No third-party beneficiary rights are created under this Agreement.
++
++Exhibit A - Form of Secondary Licenses Notice
++
++"This Source Code may also be made available under the following 
++Secondary Licenses when the conditions for such availability set forth 
++in the Eclipse Public License, v. 2.0 are satisfied: {name license(s),
++version(s), and exceptions or additional permissions here}."
++
++  Simply including a copy of this Agreement, including this Exhibit A
++  is not sufficient to license the Source Code under Secondary Licenses.
++
++  If it is not possible or desirable to put the notice in a particular
++  file, then You may include the notice in a location (such as a LICENSE
++  file in a relevant directory) where a recipient would be likely to
++  look for such a notice.
++
++  You may add additional accurate notices of copyright ownership.
++
+diff --git a/vendor/zenoh/NOTICE.md b/vendor/zenoh/NOTICE.md
+new file mode 100644
+index 0000000..7aff175
+--- /dev/null
++++ b/vendor/zenoh/NOTICE.md
+@@ -0,0 +1,40 @@
++# Notices for Eclipse zenoh
++
++This content is produced and maintained by the Eclipse zenoh project.
++
++ * Project home: https://projects.eclipse.org/projects/iot.zenoh
++
++## Trademarks
++
++Eclipse zenoh is trademark of the Eclipse Foundation. 
++Eclipse, and the Eclipse Logo are registered trademarks of the Eclipse Foundation.
++
++## Copyright
++
++All content is the property of the respective authors or their employers.
++For more information regarding authorship of content, please consult the
++listed source code repository logs.
++
++## Declared Project Licenses
++
++This program and the accompanying materials are made available under the
++terms of the Eclipse Public License 2.0 which is available at
++http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
++which is available at https://www.apache.org/licenses/LICENSE-2.0.
++
++SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
++
++## Source Code
++
++The project maintains the following source code repositories:
++
++ * https://github.com/eclipse-zenoh/zenoh.git
++ * https://github.com/eclipse-zenoh/zenoh-c.git
++ * https://github.com/eclipse-zenoh/zenoh-java.git
++ * https://github.com/eclipse-zenoh/zenoh-go.git
++ * https://github.com/eclipse-zenoh/zenoh-python.git
++
++## Third-party Content
++
++ *To be completed...*
++
+diff --git a/vendor/zenoh/src/api/liveliness_history.rs b/vendor/zenoh/src/api/liveliness_history.rs
+new file mode 100644
+index 0000000..b8ad647
+--- /dev/null
++++ b/vendor/zenoh/src/api/liveliness_history.rs
+@@ -0,0 +1,302 @@
++// Copyright (c) 2026 AOS contributors
++// SPDX-License-Identifier: Apache-2.0
++//
++// Local fix for Zenoh 1.10.1 history/live callback ordering. See
++// upstream/zenoh-history-gate.md in the AOS source distribution.
++
++use std::{
++    collections::VecDeque,
++    sync::{Arc, Mutex},
++};
++
++enum State<T> {
++    // Live events received after the session's history snapshot are held
++    // behind that snapshot until the replay and this queue have both drained.
++    Replaying(VecDeque<T>),
++    Live,
++    Closed,
++}
++
++pub(crate) struct HistoryGate<T> {
++    state: Mutex<State<T>>,
++    callback: Box<dyn Fn(T) + Send + Sync>,
++}
++
++pub(crate) struct HistoryReplay<T> {
++    gate: Arc<HistoryGate<T>>,
++    completed: bool,
++}
++
++impl<T> HistoryGate<T> {
++    pub(crate) fn new(
++        callback: impl Fn(T) + Send + Sync + 'static,
++    ) -> (Arc<Self>, HistoryReplay<T>) {
++        let gate = Arc::new(Self {
++            state: Mutex::new(State::Replaying(VecDeque::new())),
++            callback: Box::new(callback),
++        });
++        let replay = HistoryReplay {
++            gate: gate.clone(),
++            completed: false,
++        };
++        (gate, replay)
++    }
++
++    pub(crate) fn push(&self, sample: T) {
++        let mut state = self.state.lock().unwrap();
++        match &mut *state {
++            State::Replaying(pending) => pending.push_back(sample),
++            State::Live => {
++                drop(state);
++                // User code never runs while either the gate or session lock
++                // is held. Normal live callbacks retain their existing policy.
++                (self.callback)(sample);
++            }
++            State::Closed => {}
++        }
++    }
++
++    pub(crate) fn close(&self) {
++        let previous = {
++            let mut state = self.state.lock().unwrap();
++            std::mem::replace(&mut *state, State::Closed)
++        };
++        // Release queued samples outside the gate lock.
++        drop(previous);
++    }
++
++    fn recover_aborted_replay(&self) {
++        let previous = {
++            let mut state = self.state.lock().unwrap();
++            if matches!(*state, State::Replaying(_)) {
++                Some(std::mem::replace(&mut *state, State::Live))
++            } else {
++                // Explicit subscriber/session closure must remain closed.
++                None
++            }
++        };
++        // A callback panic makes the incomplete replay unusable. Discard its
++        // remaining queue outside the lock, but allow later live events.
++        drop(previous);
++    }
++}
++
++impl<T> HistoryReplay<T> {
++    pub(crate) fn finish(mut self, history: impl IntoIterator<Item = T>) {
++        for sample in history {
++            if matches!(*self.gate.state.lock().unwrap(), State::Closed) {
++                return;
++            }
++            (self.gate.callback)(sample);
++        }
++        self.drain_pending();
++    }
++
++    fn drain_pending(&mut self) {
++        loop {
++            let sample = {
++                let mut state = self.gate.state.lock().unwrap();
++                match &mut *state {
++                    State::Replaying(pending) => match pending.pop_front() {
++                        Some(sample) => sample,
++                        None => {
++                            *state = State::Live;
++                            self.completed = true;
++                            return;
++                        }
++                    },
++                    State::Closed => return,
++                    State::Live => unreachable!("one replay owner"),
++                }
++            };
++            (self.gate.callback)(sample);
++        }
++    }
++}
++
++impl<T> Drop for HistoryReplay<T> {
++    fn drop(&mut self) {
++        if !self.completed {
++            // The recovery guard also covers a panic while draining during
++            // normal Drop. Never invoke user code while already unwinding.
++            let recovery = ReplayRecovery(self.gate.clone());
++            if !std::thread::panicking() {
++                self.drain_pending();
++            }
++            drop(recovery);
++        }
++    }
++}
++
++struct ReplayRecovery<T>(Arc<HistoryGate<T>>);
++
++impl<T> Drop for ReplayRecovery<T> {
++    fn drop(&mut self) {
++        self.0.recover_aborted_replay();
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use std::sync::{mpsc, Barrier, Weak};
++    use std::thread;
++    use std::time::Duration;
++
++    #[test]
++    fn history_precedes_live_delete_with_a_deterministic_barrier() {
++        let events = Arc::new(Mutex::new(Vec::new()));
++        let recorded = events.clone();
++        let entered = Arc::new(Barrier::new(2));
++        let proceed = Arc::new(Barrier::new(2));
++        let inside = entered.clone();
++        let resume = proceed.clone();
++        let (gate, replay) = HistoryGate::new(move |event| {
++            if event == "history_put" {
++                inside.wait();
++                resume.wait();
++            }
++            recorded.lock().unwrap().push(event);
++        });
++        let worker = thread::spawn(move || replay.finish(["history_put"]));
++        entered.wait();
++        gate.push("live_delete");
++        gate.push("live_put_same_key");
++        assert!(events.lock().unwrap().is_empty());
++        proceed.wait();
++        worker.join().unwrap();
++        assert_eq!(
++            *events.lock().unwrap(),
++            ["history_put", "live_delete", "live_put_same_key"]
++        );
++        gate.push("live_after_replay");
++        assert_eq!(events.lock().unwrap().last(), Some(&"live_after_replay"));
++    }
++
++    #[test]
++    fn callback_can_reenter_without_a_gate_lock() {
++        let owner: Arc<Mutex<Weak<HistoryGate<u8>>>> = Arc::default();
++        let inside = owner.clone();
++        let events = Arc::new(Mutex::new(Vec::new()));
++        let recorded = events.clone();
++        let (gate, replay) = HistoryGate::new(move |event| {
++            recorded.lock().unwrap().push(event);
++            if event == 1 {
++                inside.lock().unwrap().upgrade().unwrap().push(2);
++            }
++        });
++        *owner.lock().unwrap() = Arc::downgrade(&gate);
++        replay.finish([1]);
++        assert_eq!(*events.lock().unwrap(), [1, 2]);
++    }
++
++    #[test]
++    fn panic_releases_buffered_payloads_and_allows_future_live_events() {
++        let first = std::sync::atomic::AtomicBool::new(true);
++        let delivered = Arc::new(Mutex::new(0));
++        let observed = delivered.clone();
++        let (gate, replay) = HistoryGate::new(move |_: Arc<()>| {
++            if first.swap(false, std::sync::atomic::Ordering::Relaxed) {
++                panic!("callback failed");
++            }
++            *observed.lock().unwrap() += 1;
++        });
++        let payload = Arc::new(());
++        gate.push(payload.clone());
++        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++            replay.finish([Arc::new(())]);
++        }));
++        assert!(outcome.is_err());
++        assert_eq!(Arc::strong_count(&payload), 1);
++        gate.push(payload.clone());
++        assert_eq!(Arc::strong_count(&payload), 1);
++        assert_eq!(*delivered.lock().unwrap(), 1);
++        assert!(matches!(*gate.state.lock().unwrap(), State::Live));
++    }
++
++    #[test]
++    fn dropping_an_unpolled_replay_drains_pending_samples_and_opens_gate() {
++        let delivered = Arc::new(Mutex::new(0));
++        let observed = delivered.clone();
++        let (gate, replay) = HistoryGate::new(move |_: Arc<()>| *observed.lock().unwrap() += 1);
++        let payload = Arc::new(());
++        gate.push(payload.clone());
++        drop(replay);
++        assert_eq!(Arc::strong_count(&payload), 1);
++        assert_eq!(*delivered.lock().unwrap(), 1);
++        gate.push(payload.clone());
++        assert_eq!(Arc::strong_count(&payload), 1);
++        assert_eq!(*delivered.lock().unwrap(), 2);
++    }
++
++    #[test]
++    fn events_arriving_during_drain_stay_in_fifo_order() {
++        let owner: Arc<Mutex<Weak<HistoryGate<u8>>>> = Arc::default();
++        let inside = owner.clone();
++        let events = Arc::new(Mutex::new(Vec::new()));
++        let recorded = events.clone();
++        let (gate, replay) = HistoryGate::new(move |event| {
++            recorded.lock().unwrap().push(event);
++            let gate = inside.lock().unwrap().upgrade().unwrap();
++            assert!(
++                gate.state.try_lock().is_ok(),
++                "callback must not hold gate lock"
++            );
++            if event == 2 {
++                gate.push(4);
++            }
++        });
++        *owner.lock().unwrap() = Arc::downgrade(&gate);
++        gate.push(2);
++        gate.push(3);
++        replay.finish([1]);
++        assert_eq!(*events.lock().unwrap(), [1, 2, 3, 4]);
++    }
++
++    #[test]
++    fn panic_during_drop_drain_also_opens_gate() {
++        let first = std::sync::atomic::AtomicBool::new(true);
++        let (gate, replay) = HistoryGate::new(move |_: Arc<()>| {
++            if first.swap(false, std::sync::atomic::Ordering::Relaxed) {
++                panic!("callback failed during cancellation");
++            }
++        });
++        let payload = Arc::new(());
++        gate.push(payload.clone());
++        gate.push(payload.clone());
++        let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++            drop(replay);
++        }));
++        assert!(outcome.is_err());
++        assert_eq!(Arc::strong_count(&payload), 1);
++        gate.push(payload.clone());
++        assert_eq!(Arc::strong_count(&payload), 1);
++        assert!(matches!(*gate.state.lock().unwrap(), State::Live));
++    }
++
++    #[test]
++    fn close_during_replay_discards_pending_events_without_waiting_for_callback() {
++        let (entered_tx, entered_rx) = mpsc::channel();
++        let proceed = Arc::new(Barrier::new(2));
++        let resume = proceed.clone();
++        let (gate, replay) = HistoryGate::new(move |_: Arc<()>| {
++            entered_tx.send(()).unwrap();
++            resume.wait();
++        });
++        let worker = thread::spawn(move || replay.finish([Arc::new(()), Arc::new(())]));
++        entered_rx.recv_timeout(Duration::from_secs(2)).unwrap();
++        let payload = Arc::new(());
++        gate.push(payload.clone());
++        gate.close();
++        assert_eq!(Arc::strong_count(&payload), 1);
++        proceed.wait();
++        worker.join().unwrap();
++        assert!(
++            entered_rx.try_recv().is_err(),
++            "closed replay must stop before the next callback"
++        );
++        let weak = Arc::downgrade(&gate);
++        drop(gate);
++        assert!(weak.upgrade().is_none(), "close must not retain the gate");
++    }
++}
+diff --git a/vendor/zenoh/src/api/mod.rs b/vendor/zenoh/src/api/mod.rs
+index df8f825..99a1c12 100644
+--- a/vendor/zenoh/src/api/mod.rs
++++ b/vendor/zenoh/src/api/mod.rs
+@@ -11,6 +11,8 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: register the local liveliness history ordering helper.
++// See upstream/zenoh-history-gate.md in the AOS source distribution.
+ 
+ pub(crate) type Id = u32;
+ 
+@@ -25,6 +27,7 @@ pub(crate) mod handlers;
+ pub(crate) mod info;
+ pub(crate) mod key_expr;
+ pub(crate) mod liveliness;
++pub(crate) mod liveliness_history;
+ #[cfg(feature = "plugins")]
+ pub(crate) mod loader;
+ pub(crate) mod matching;
+diff --git a/vendor/zenoh/src/api/session.rs b/vendor/zenoh/src/api/session.rs
+index ea93d5a..02e0631 100644
+--- a/vendor/zenoh/src/api/session.rs
++++ b/vendor/zenoh/src/api/session.rs
+@@ -11,6 +11,8 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: gate cached liveliness history ahead of later live events.
++// See ../../../../upstream/zenoh-history-gate.md in the AOS source distribution.
+ use std::{
+     collections::{hash_map::Entry, HashMap},
+     convert::TryInto,
+@@ -409,6 +411,7 @@ impl SessionState {
+             origin,
+             callback,
+             history: false,
++            history_gate: None,
+         };
+ 
+         let declared_sub = origin != Locality::SessionLocal;
+@@ -862,6 +865,11 @@ impl fmt::Display for SessionClosedError {
+ impl std::error::Error for SessionClosedError {}
+ 
+ impl Session {
++    /// AOS compile-time guard against silently selecting unpatched Zenoh.
++    #[doc(hidden)]
++    pub const AOS_LIVELINESS_HISTORY_PATCH_VERSION: u32 =
++        crate::net::routing::dispatcher::tables::AOS_ROUTING_DECLARATIONS_PATCH_VERSION;
++
+     pub(crate) fn init(
+         runtime: GenericRuntime,
+         aggregated_subscribers: Vec<OwnedKeyExpr>,
+@@ -1808,6 +1816,9 @@ impl Session {
+         };
+         if let Some(sub_state) = state.subscribers_mut(kind).remove(&sid) {
+             trace!("undeclare_subscriber({:?})", sub_state);
++            if let Some(gate) = &sub_state.history_gate {
++                gate.close();
++            }
+             for res in state
+                 .local_resources
+                 .values_mut()
+@@ -2025,6 +2036,31 @@ impl Session {
+         let primitives = state.primitives()?;
+         self.register_callback_drop_notifier(callback_drop_notifier, &mut callback);
+         let id = self.0.runtime.next_id();
++        // Capture history under the same state lock used to register the
++        // subscriber. Live events must queue behind this snapshot, rather
++        // than racing its asynchronous replay after the lock is released.
++        let known_tokens = if history {
++            state
++                .remote_tokens
++                .values()
++                .filter(|token| key_expr.intersects(token))
++                .cloned()
++                .collect::<Vec<KeyExpr<'static>>>()
++        } else {
++            vec![]
++        };
++        let (callback, history_gate, replay) = if known_tokens.is_empty() {
++            (callback, None, None)
++        } else {
++            let (gate, replay) =
++                super::liveliness_history::HistoryGate::new(move |sample| callback.call(sample));
++            let incoming = gate.clone();
++            (
++                Callback::from(move |sample| incoming.push(sample)),
++                Some(gate),
++                Some(replay),
++            )
++        };
+         let sub_state = SubscriberState {
+             id,
+             remote_id: id,
+@@ -2032,6 +2068,7 @@ impl Session {
+             origin,
+             callback: callback.clone(),
+             history,
++            history_gate,
+         };
+ 
+         let sub_state = Arc::new(sub_state);
+@@ -2062,40 +2099,27 @@ impl Session {
+             }
+         }
+ 
+-        let known_tokens = if history {
+-            state
+-                .remote_tokens
+-                .values()
+-                .filter(|token| key_expr.intersects(token))
+-                .cloned()
+-                .collect::<Vec<KeyExpr<'static>>>()
+-        } else {
+-            vec![]
+-        };
+-
+         drop(state);
+ 
+-        if !known_tokens.is_empty() {
++        if let Some(replay) = replay {
+             self.0
+                 .task_controller
+                 .spawn_with_rt(zenoh_runtime::ZRuntime::Net, async move {
+-                    for token in known_tokens {
+-                        callback.call(Sample {
+-                            key_expr: token,
+-                            payload: ZBytes::new(),
+-                            kind: SampleKind::Put,
+-                            encoding: Encoding::default(),
+-                            timestamp: None,
+-                            qos: QoS::default(),
+-                            #[cfg(feature = "unstable")]
+-                            reliability: Reliability::Reliable,
+-                            #[cfg(feature = "unstable")]
+-                            source_info: None,
+-                            attachment: None,
+-                            #[cfg(feature = "unstable")]
+-                            timestamp_stack: None,
+-                        });
+-                    }
++                    replay.finish(known_tokens.into_iter().map(|token| Sample {
++                        key_expr: token,
++                        payload: ZBytes::new(),
++                        kind: SampleKind::Put,
++                        encoding: Encoding::default(),
++                        timestamp: None,
++                        qos: QoS::default(),
++                        #[cfg(feature = "unstable")]
++                        reliability: Reliability::Reliable,
++                        #[cfg(feature = "unstable")]
++                        source_info: None,
++                        attachment: None,
++                        #[cfg(feature = "unstable")]
++                        timestamp_stack: None,
++                    }));
+                 });
+         }
+ 
+@@ -3710,7 +3734,16 @@ impl Closee for WeakSession {
+     type CloseArgs = SessionCloseArgs;
+     #[allow(unused_variables)] // SessionCloseArgs are only required for wait until callback execution ends under unstable
+     async fn close_inner(&self, close_args: SessionCloseArgs) {
+-        let primitives = zwrite!(self.0.state).primitives.take();
++        let primitives = {
++            let mut state = zwrite!(self.0.state);
++            let primitives = state.primitives.take();
++            for subscriber in state.liveliness_subscribers.values() {
++                if let Some(gate) = &subscriber.history_gate {
++                    gate.close();
++                }
++            }
++            primitives
++        };
+ 
+         // defer the cleanup of internal data structures by taking them out of the locked state
+         // this is needed because callbacks may contain entities which need to acquire the
+diff --git a/vendor/zenoh/src/api/subscriber.rs b/vendor/zenoh/src/api/subscriber.rs
+index dca662d..3f8417e 100644
+--- a/vendor/zenoh/src/api/subscriber.rs
++++ b/vendor/zenoh/src/api/subscriber.rs
+@@ -11,6 +11,8 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: close the local liveliness history gate with its owner.
++// See upstream/zenoh-history-gate.md in the AOS source distribution.
+ use std::{
+     fmt,
+     future::{IntoFuture, Ready},
+@@ -27,6 +29,7 @@ use crate::api::{
+     cancellation::SyncGroup,
+     handlers::Callback,
+     key_expr::KeyExpr,
++    liveliness_history::HistoryGate,
+     sample::{Locality, Sample},
+     session::{UndeclarableSealed, WeakSession},
+     Id,
+@@ -39,6 +42,15 @@ pub(crate) struct SubscriberState {
+     pub(crate) origin: Locality,
+     pub(crate) callback: Callback<Sample>,
+     pub(crate) history: bool,
++    pub(crate) history_gate: Option<std::sync::Arc<HistoryGate<Sample>>>,
++}
++
++impl Drop for SubscriberState {
++    fn drop(&mut self) {
++        if let Some(gate) = &self.history_gate {
++            gate.close();
++        }
++    }
+ }
+ 
+ impl fmt::Debug for SubscriberState {
+diff --git a/vendor/zenoh/src/net/primitives/demux.rs b/vendor/zenoh/src/net/primitives/demux.rs
+index b6f46c3..fc31087 100644
+--- a/vendor/zenoh/src/net/primitives/demux.rs
++++ b/vendor/zenoh/src/net/primitives/demux.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ use std::{any::Any, cell::OnceCell, sync::Arc};
+ 
+ use arc_swap::ArcSwapOption;
+@@ -156,15 +157,18 @@ impl TransportPeerEventHandler for DeMux {
+                         let interest_id = interest.id;
+                         if !interceptor.intercept(&mut msg, &mut ctx) {
+                             // request was blocked by an interceptor, we need to send declare final to avoid timeout error
+-                            self.face.state.primitives.send_declare(RoutingContext::new(
+-                                &mut Declare {
++                            let _drain = self.face.tables.declarations.drain_after_background();
++                            let _ctrl_lock = zlock!(self.face.tables.ctrl_lock);
++                            self.face.tables.declarations.enqueue(
++                                &self.face.state.primitives,
++                                RoutingContext::new(Declare {
+                                     interest_id: Some(interest_id),
+                                     ext_qos: ext::QoSType::DECLARE,
+                                     ext_tstamp: None,
+                                     ext_nodeid: ext::NodeIdType::DEFAULT,
+                                     body: DeclareBody::DeclareFinal(DeclareFinal),
+-                                },
+-                            ));
++                                }),
++                            );
+                             return Ok(());
+                         }
+                     }
+@@ -179,8 +183,17 @@ impl TransportPeerEventHandler for DeMux {
+ 
+         match msg.body {
+             NetworkBodyMut::Push(m) => self.face.send_push(m, msg.reliability),
+-            NetworkBodyMut::Declare(m) => self.face.send_declare(m),
+-            NetworkBodyMut::Interest(m) => self.face.send_interest(m),
++            NetworkBodyMut::Declare(m) => {
++                // Only declaration-producing control messages establish this
++                // boundary. Nested Face batches inherit callback isolation;
++                // data-plane messages never touch the declaration outbox.
++                let _drain = self.face.tables.declarations.drain_after_background();
++                self.face.send_declare(m);
++            }
++            NetworkBodyMut::Interest(m) => {
++                let _drain = self.face.tables.declarations.drain_after_background();
++                self.face.send_interest(m);
++            }
+             NetworkBodyMut::Request(m) => self.face.send_request(m),
+             NetworkBodyMut::Response(m) => self.face.send_response(m),
+             NetworkBodyMut::ResponseFinal(m) => self.face.send_response_final(m),
+@@ -189,7 +202,7 @@ impl TransportPeerEventHandler for DeMux {
+                     bail!("Received network OAM from face w/o transport");
+                 }
+ 
+-                let mut declares = vec![];
++                let _drain = self.face.tables.declarations.drain_after_background();
+                 let ctrl_lock = zlock!(self.face.tables.ctrl_lock);
+                 let mut wtables = zwrite!(self.face.tables.tables);
+                 let tables = &mut *wtables;
+@@ -198,7 +211,7 @@ impl TransportPeerEventHandler for DeMux {
+                     tables_lock: &self.face.tables,
+                     tables: &mut tables.data,
+                     src_face: &mut self.face.state.clone(),
+-                    send_declare: &mut |p, m| declares.push((p.clone(), m)),
++                    send_declare: &mut |p, m| self.face.tables.declarations.enqueue(p, m),
+                 };
+ 
+                 let (owner_hat, other_hats) = tables
+@@ -214,10 +227,6 @@ impl TransportPeerEventHandler for DeMux {
+ 
+                 drop(wtables);
+                 drop(ctrl_lock);
+-
+-                for (p, m) in declares {
+-                    m.with_mut(|m| p.send_declare(m));
+-                }
+             }
+         }
+ 
+@@ -229,6 +238,7 @@ impl TransportPeerEventHandler for DeMux {
+     fn del_link(&self, _link: Link) {}
+ 
+     fn closed(&self) {
++        let _drain = self.face.tables.declarations.drain_after_background();
+         self.face.send_close();
+     }
+ 
+@@ -236,3 +246,46 @@ impl TransportPeerEventHandler for DeMux {
+         self
+     }
+ }
++
++#[cfg(test)]
++mod aos_declaration_scope_tests {
++    use super::*;
++    use zenoh_protocol::{
++        core::{Region, WhatAmI},
++        network::{NetworkMessage, Push},
++        zenoh::Put,
++    };
++
++    use crate::net::{primitives::DummyPrimitives, routing::gateway::GatewayBuilder};
++
++    #[test]
++    fn push_ingress_does_not_begin_a_declaration_batch() {
++        let mut config = zenoh_config::Config::default().expanded();
++        config.set_mode(Some(WhatAmI::Client)).unwrap();
++        let gateway = GatewayBuilder::new(&config)
++            .subregions(vec![Region::Local])
++            .build()
++            .unwrap();
++        let face = gateway.new_session(Arc::new(DummyPrimitives));
++        let demux = DeMux::new(
++            (*face).clone(),
++            None,
++            Arc::new(ArcSwapOption::empty()),
++            ZenohIdProto::default(),
++        );
++        let before = gateway.tables.declarations.batch_starts();
++        for _ in 0..128 {
++            let mut message: NetworkMessage = Push {
++                wire_expr: "diagnostic/push/no-declare-scope".into(),
++                ..Put::default().into()
++            }
++            .into();
++            demux.handle_message(message.as_mut()).unwrap();
++        }
++        assert_eq!(
++            gateway.tables.declarations.batch_starts() - before,
++            0,
++            "data-plane ingress unexpectedly created a declaration scope"
++        );
++    }
++}
+diff --git a/vendor/zenoh/src/net/routing/dispatcher/declare_outbox.rs b/vendor/zenoh/src/net/routing/dispatcher/declare_outbox.rs
+new file mode 100644
+index 0000000..7b7d44a
+--- /dev/null
++++ b/vendor/zenoh/src/net/routing/dispatcher/declare_outbox.rs
+@@ -0,0 +1,960 @@
++//
++// Copyright (c) 2026 AOS contributors
++//
++// SPDX-License-Identifier: Apache-2.0
++//
++
++//! Per-destination FIFO for routing declarations.
++//!
++//! Producers enqueue while holding the routing control lock. Begin a batch
++//! before acquiring routing locks and drain it after releasing them. A batch
++//! may claim only destinations it touched; it never steals unrelated work.
++//! The short queue mutex is never held while sending or dropping a destination.
++
++use std::{
++    collections::{HashMap, HashSet, VecDeque},
++    marker::PhantomData,
++    panic::{catch_unwind, resume_unwind, AssertUnwindSafe},
++    rc::Rc,
++    sync::{Arc, Mutex, MutexGuard},
++    thread::{self, ThreadId},
++    time::{Duration, Instant},
++};
++
++struct Lane<K: ?Sized, T> {
++    destination: Arc<K>,
++    pending: VecDeque<T>,
++    owner_since: Option<Instant>,
++    high_water: usize,
++}
++
++struct Retired<K: ?Sized, T> {
++    // Keep both payloads and the destination alive until routing locks and the
++    // queue mutex have been released. Their destructors may call other code.
++    _destination: Arc<K>,
++    _pending: VecDeque<T>,
++}
++
++struct Batch<K: ?Sized, T> {
++    background: bool,
++    destinations: Vec<Arc<K>>,
++    seen: HashSet<usize>,
++    retired: Vec<Retired<K, T>>,
++}
++
++impl<K: ?Sized, T> Default for Batch<K, T> {
++    fn default() -> Self {
++        Self {
++            background: false,
++            destinations: Vec::new(),
++            seen: HashSet::new(),
++            retired: Vec::new(),
++        }
++    }
++}
++
++struct State<K: ?Sized, T> {
++    lanes: HashMap<usize, Lane<K, T>>,
++    // A synchronous production scope never crosses an await. The guard is
++    // !Send; nested calls on the same thread get independent touched sets.
++    batches: HashMap<ThreadId, Vec<Batch<K, T>>>,
++    pending: usize,
++    high_water: usize,
++    last_warning: Option<Instant>,
++}
++
++#[derive(Clone, Copy)]
++struct WarningPolicy {
++    pending: usize,
++    owner_age: Duration,
++    interval: Duration,
++}
++
++impl Default for WarningPolicy {
++    fn default() -> Self {
++        Self {
++            pending: 1_024,
++            owner_age: Duration::from_secs(1),
++            interval: Duration::from_secs(30),
++        }
++    }
++}
++
++/// Production counters: these are not removed in non-test builds.
++#[derive(Debug, Clone, Copy)]
++pub(crate) struct QueueWarning {
++    pub(crate) destination: usize,
++    pub(crate) lane_pending: usize,
++    pub(crate) lane_high_water: usize,
++    pub(crate) owner_age: Duration,
++    pub(crate) total_pending: usize,
++    pub(crate) total_high_water: usize,
++}
++
++pub(crate) struct DeclareOutbox<K: ?Sized, T> {
++    state: Mutex<State<K, T>>,
++    warning_policy: WarningPolicy,
++    #[cfg(test)]
++    batch_starts: std::sync::atomic::AtomicUsize,
++}
++
++impl<K: ?Sized, T> Default for DeclareOutbox<K, T> {
++    fn default() -> Self {
++        Self {
++            state: Mutex::new(State {
++                lanes: HashMap::new(),
++                batches: HashMap::new(),
++                pending: 0,
++                high_water: 0,
++                last_warning: None,
++            }),
++            warning_policy: WarningPolicy::default(),
++            #[cfg(test)]
++            batch_starts: std::sync::atomic::AtomicUsize::new(0),
++        }
++    }
++}
++
++impl<K: ?Sized, T> DeclareOutbox<K, T> {
++    fn lock(&self) -> MutexGuard<'_, State<K, T>> {
++        self.state.lock().unwrap_or_else(|error| error.into_inner())
++    }
++
++    pub(crate) fn begin_batch(&self) -> DeclarationBatch<'_, K, T> {
++        self.begin_batch_with_mode(false)
++    }
++
++    pub(crate) fn begin_background_batch(&self) -> DeclarationBatch<'_, K, T> {
++        self.begin_batch_with_mode(true)
++    }
++
++    fn begin_batch_with_mode(&self, background: bool) -> DeclarationBatch<'_, K, T> {
++        #[cfg(test)]
++        self.batch_starts
++            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++        let thread = thread::current().id();
++        let mut state = self.lock();
++        let stack = state.batches.entry(thread).or_default();
++        // Transport scopes can enter ordinary Face producers synchronously.
++        // Every nested batch inherits their callback-panic isolation boundary.
++        let background = background || stack.last().is_some_and(|batch| batch.background);
++        stack.push(Batch {
++            background,
++            ..Batch::default()
++        });
++        DeclarationBatch {
++            outbox: self,
++            thread,
++            active: true,
++            background,
++            _not_send: PhantomData,
++        }
++    }
++
++    /// Generation and enqueue must share the same routing critical section.
++    /// The batch retains each touched destination Arc, so even after close an
++    /// old batch cannot accidentally claim an unrelated reused address.
++    pub(crate) fn enqueue(&self, destination: &Arc<K>, item: T) -> Option<QueueWarning> {
++        let id = Arc::as_ptr(destination) as *const () as usize;
++        let mut state = self.lock();
++        let batch = state
++            .batches
++            .get_mut(&thread::current().id())
++            .and_then(|stack| stack.last_mut())
++            .expect("routing declarations require an active production batch");
++        if batch.seen.insert(id) {
++            batch.destinations.push(destination.clone());
++        }
++        let lane = state.lanes.entry(id).or_insert_with(|| Lane {
++            destination: destination.clone(),
++            pending: VecDeque::new(),
++            owner_since: None,
++            high_water: 0,
++        });
++        lane.pending.push_back(item);
++        lane.high_water = lane.high_water.max(lane.pending.len());
++        state.pending += 1;
++        state.high_water = state.high_water.max(state.pending);
++        self.warning(&mut state, id)
++    }
++
++    /// Called after removing a destination face under the control lock. Queued
++    /// delivery to this closed face is useless. Its in-flight callback may
++    /// finish; no pending item is retained behind it. Drops happen at batch end.
++    pub(crate) fn discard(&self, destination: &Arc<K>) {
++        let id = Arc::as_ptr(destination) as *const () as usize;
++        let mut state = self.lock();
++        let Some(lane) = state.lanes.get_mut(&id) else {
++            return;
++        };
++        let pending = std::mem::take(&mut lane.pending);
++        let count = pending.len();
++        let retired = Retired {
++            _destination: lane.destination.clone(),
++            _pending: pending,
++        };
++        if lane.owner_since.is_none() {
++            // The retired value and the production batch still retain Arcs.
++            state.lanes.remove(&id);
++        }
++        state.pending -= count;
++        state
++            .batches
++            .get_mut(&thread::current().id())
++            .and_then(|stack| stack.last_mut())
++            .expect("discarding a face requires an active production batch")
++            .retired
++            .push(retired);
++    }
++
++    fn warning(&self, state: &mut State<K, T>, id: usize) -> Option<QueueWarning> {
++        let lane = state.lanes.get_mut(&id)?;
++        let now = Instant::now();
++        let owner_age = lane
++            .owner_since
++            .map(|start| now.duration_since(start))
++            .unwrap_or_default();
++        if (lane.pending.len() < self.warning_policy.pending
++            && !(lane.owner_since.is_some() && owner_age >= self.warning_policy.owner_age))
++            || state
++                .last_warning
++                .is_some_and(|last| now.duration_since(last) < self.warning_policy.interval)
++        {
++            return None;
++        }
++        // Rate-limit across this outbox, including repeated creation/removal
++        // of the same lane. No per-closed-destination tombstones are retained.
++        state.last_warning = Some(now);
++        Some(QueueWarning {
++            destination: id,
++            lane_pending: lane.pending.len(),
++            lane_high_water: lane.high_water,
++            owner_age,
++            total_pending: state.pending,
++            total_high_water: state.high_water,
++        })
++    }
++
++    /// Never waits for another owner or claims a lane absent from this batch.
++    /// A busy lane is owned until empty. Enqueue, empty check, owner release
++    /// and removal share one mutex, preventing lost wakeups and split owners.
++    fn drain(
++        &self,
++        destinations: Vec<Arc<K>>,
++        mut send: impl FnMut(&Arc<K>, T),
++        mut report: impl FnMut(&Arc<K>, QueueWarning),
++    ) {
++        let mut first_panic = None;
++        for keep_alive in destinations {
++            let id = Arc::as_ptr(&keep_alive) as *const () as usize;
++            {
++                let mut state = self.lock();
++                let Some(lane) = state.lanes.get_mut(&id) else {
++                    continue;
++                };
++                if lane.owner_since.is_some() {
++                    continue;
++                }
++                lane.owner_since = Some(Instant::now());
++            }
++            let mut owner = LaneOwner {
++                outbox: self,
++                destination: id,
++                keep_alive,
++                active: true,
++            };
++            loop {
++                let (item, warning) = {
++                    let mut state = self.lock();
++                    let warning = self.warning(&mut state, id);
++                    let lane = state
++                        .lanes
++                        .get_mut(&id)
++                        .expect("a draining lane remains indexed");
++                    let item = lane.pending.pop_front();
++                    if item.is_some() {
++                        state.pending -= 1;
++                    } else {
++                        owner.active = false;
++                        state.lanes.remove(&id);
++                    }
++                    (item, warning)
++                };
++                if let Some(warning) = warning {
++                    if let Err(panic) =
++                        catch_unwind(AssertUnwindSafe(|| report(&owner.keep_alive, warning)))
++                    {
++                        // A diagnostic sink must not abandon the popped item
++                        // or any other destination touched by this producer.
++                        if first_panic.is_none() {
++                            first_panic = Some(panic);
++                        }
++                    }
++                }
++                let Some(item) = item else { break };
++                if let Err(panic) = catch_unwind(AssertUnwindSafe(|| send(&owner.keep_alive, item)))
++                {
++                    // Finish this batch's FIFO work before restoring the first
++                    // panic. Unrelated producers' lanes are never visited.
++                    if first_panic.is_none() {
++                        first_panic = Some(panic)
++                    }
++                }
++            }
++        }
++        if let Some(panic) = first_panic {
++            resume_unwind(panic)
++        }
++    }
++
++    #[cfg(test)]
++    fn counts(&self) -> (usize, usize, usize) {
++        let state = self.lock();
++        (state.lanes.len(), state.pending, state.high_water)
++    }
++
++    #[cfg(test)]
++    pub(crate) fn batch_starts(&self) -> usize {
++        self.batch_starts.load(std::sync::atomic::Ordering::Relaxed)
++    }
++}
++
++pub(crate) struct DeclarationBatch<'a, K: ?Sized, T> {
++    outbox: &'a DeclareOutbox<K, T>,
++    thread: ThreadId,
++    active: bool,
++    background: bool,
++    _not_send: PhantomData<Rc<()>>,
++}
++
++impl<K: ?Sized, T> DeclarationBatch<'_, K, T> {
++    fn finish(&mut self) -> Batch<K, T> {
++        self.active = false;
++        let mut state = self.outbox.lock();
++        let stack = state
++            .batches
++            .get_mut(&self.thread)
++            .expect("an active batch remains registered");
++        let batch = stack
++            .pop()
++            .expect("production batches finish in reverse order");
++        if stack.is_empty() {
++            state.batches.remove(&self.thread);
++        }
++        batch
++    }
++
++    /// Pop this production scope before calling user code, so nested scopes
++    /// cannot add destinations to the already running outer drainer.
++    pub(crate) fn drain(
++        mut self,
++        send: impl FnMut(&Arc<K>, T),
++        report: impl FnMut(&Arc<K>, QueueWarning),
++    ) {
++        let Batch {
++            destinations,
++            retired,
++            ..
++        } = self.finish();
++        drop(retired);
++        self.outbox.drain(destinations, send, report);
++    }
++
++    /// Background callers report the panic and keep their worker alive. The
++    /// ordinary drain still finishes touched FIFO work and releases owners.
++    pub(crate) fn drain_background(
++        self,
++        send: impl FnMut(&Arc<K>, T),
++        report: impl FnMut(&Arc<K>, QueueWarning),
++    ) -> Result<(), Box<dyn std::any::Any + Send>> {
++        catch_unwind(AssertUnwindSafe(|| self.drain(send, report)))
++    }
++
++    /// Production Drop guards must dispatch even while a caller is unwinding.
++    /// Suppress a second callback panic in that case, preserving the original
++    /// panic and the invariant that every generated idle lane has a drainer.
++    pub(crate) fn drain_in_scope(
++        self,
++        send: impl FnMut(&Arc<K>, T),
++        report: impl FnMut(&Arc<K>, QueueWarning),
++    ) -> Result<(), Box<dyn std::any::Any + Send>> {
++        if self.background || thread::panicking() {
++            self.drain_background(send, report)
++        } else {
++            self.drain(send, report);
++            Ok(())
++        }
++    }
++}
++
++impl<K: ?Sized, T> Drop for DeclarationBatch<'_, K, T> {
++    fn drop(&mut self) {
++        if self.active {
++            // This fallback only removes an abandoned generic scope. The
++            // production Drop guard always calls drain_in_scope, even during
++            // unwinding. Retired values and Arcs drop outside the queue mutex.
++            drop(self.finish());
++        }
++    }
++}
++
++struct LaneOwner<'a, K: ?Sized, T> {
++    outbox: &'a DeclareOutbox<K, T>,
++    destination: usize,
++    keep_alive: Arc<K>,
++    active: bool,
++}
++
++impl<K: ?Sized, T> Drop for LaneOwner<'_, K, T> {
++    fn drop(&mut self) {
++        if self.active {
++            if let Some(lane) = self.outbox.lock().lanes.get_mut(&self.destination) {
++                lane.owner_since = None;
++            }
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use std::{
++        panic::{catch_unwind, AssertUnwindSafe},
++        sync::{mpsc, Arc, Mutex},
++        thread,
++        time::Duration,
++    };
++
++    use super::{DeclareOutbox, WarningPolicy};
++    const LIMIT: Duration = Duration::from_secs(5);
++
++    fn unwind_dispatch(callback_panics: bool) {
++        struct EnqueueOnDrop<'a> {
++            outbox: &'a DeclareOutbox<(), usize>,
++            lane: &'a Arc<()>,
++            delivered: &'a Mutex<Vec<usize>>,
++            callback_panics: bool,
++        }
++        impl Drop for EnqueueOnDrop<'_> {
++            fn drop(&mut self) {
++                assert!(thread::panicking());
++                let batch = self.outbox.begin_batch();
++                for item in [1, 2, 3] {
++                    let _ = self.outbox.enqueue(self.lane, item);
++                }
++                let result = batch.drain_in_scope(
++                    |_, item| {
++                        self.delivered.lock().unwrap().push(item);
++                        if self.callback_panics && item == 1 {
++                            panic!("secondary callback panic")
++                        }
++                    },
++                    |_, _| {},
++                );
++                assert_eq!(result.is_err(), self.callback_panics);
++            }
++        }
++        let outbox = DeclareOutbox::default();
++        let lane = Arc::new(());
++        let delivered = Mutex::new(Vec::new());
++        let result = catch_unwind(AssertUnwindSafe(|| {
++            let _guard = EnqueueOnDrop {
++                outbox: &outbox,
++                lane: &lane,
++                delivered: &delivered,
++                callback_panics,
++            };
++            panic!("original application panic")
++        }));
++        assert_eq!(
++            result.unwrap_err().downcast_ref::<&str>(),
++            Some(&"original application panic")
++        );
++        assert_eq!(*delivered.lock().unwrap(), [1, 2, 3]);
++        // No later declaration is allowed to rescue an abandoned lane.
++        assert_eq!(outbox.counts(), (0, 0, 3));
++        assert!(outbox.lock().batches.is_empty());
++    }
++
++    #[test]
++    fn unwind_drop_dispatches_its_generated_batch_without_later_producers() {
++        unwind_dispatch(false);
++    }
++
++    #[test]
++    fn unwind_drop_catches_a_second_callback_panic_and_preserves_the_original() {
++        unwind_dispatch(true);
++    }
++
++    #[test]
++    fn nested_face_batch_inherits_background_panic_isolation() {
++        let outbox = DeclareOutbox::default();
++        let lane = Arc::new(());
++        let outer = outbox.begin_background_batch();
++        let nested = outbox.begin_batch();
++        let _ = outbox.enqueue(&lane, 1);
++        assert!(nested
++            .drain_in_scope(|_, _| panic!("transport callback panic"), |_, _| {})
++            .is_err());
++        outer
++            .drain_in_scope(|_, _| unreachable!(), |_, _| {})
++            .unwrap();
++        assert_eq!(outbox.counts(), (0, 0, 1));
++        // Isolation ends with the transport scope; ordinary callers still
++        // receive their callback panic after all touched work is dispatched.
++        let ordinary = outbox.begin_batch();
++        let _ = outbox.enqueue(&lane, 2);
++        let result = catch_unwind(AssertUnwindSafe(|| {
++            let _ = ordinary.drain_in_scope(|_, _| panic!("ordinary callback panic"), |_, _| {});
++        }));
++        assert_eq!(
++            result.unwrap_err().downcast_ref::<&str>(),
++            Some(&"ordinary callback panic")
++        );
++        assert_eq!(outbox.counts(), (0, 0, 1));
++        assert_eq!(outbox.batch_starts(), 3);
++    }
++
++    #[test]
++    fn reentry_enqueues_behind_pending_items_without_recursive_delivery() {
++        let outbox = DeclareOutbox::default();
++        let lane = Arc::new(());
++        let events = Mutex::new(Vec::new());
++        let batch = outbox.begin_batch();
++        let _ = outbox.enqueue(&lane, 1);
++        let _ = outbox.enqueue(&lane, 2);
++        batch.drain(
++            |_, item| {
++                events.lock().unwrap().push((item, "begin"));
++                if item == 1 {
++                    let nested = outbox.begin_batch();
++                    let _ = outbox.enqueue(&lane, 3);
++                    nested.drain(
++                        |_, _| panic!("a busy lane must not be drained recursively"),
++                        |_, _| {},
++                    );
++                }
++                events.lock().unwrap().push((item, "end"));
++            },
++            |_, _| {},
++        );
++        assert_eq!(
++            *events.lock().unwrap(),
++            [
++                (1, "begin"),
++                (1, "end"),
++                (2, "begin"),
++                (2, "end"),
++                (3, "begin"),
++                (3, "end")
++            ]
++        );
++        assert_eq!(outbox.counts(), (0, 0, 2));
++    }
++
++    #[test]
++    fn an_independent_lane_progresses_while_another_callback_is_blocked() {
++        let outbox = Arc::new(DeclareOutbox::default());
++        let first = Arc::new(());
++        let second = Arc::new(());
++        let (entered_tx, entered_rx) = mpsc::channel();
++        let (release_tx, release_rx) = mpsc::channel();
++        let blocked = outbox.clone();
++        let worker = thread::spawn(move || {
++            let batch = blocked.begin_batch();
++            let _ = blocked.enqueue(&first, 1);
++            batch.drain(
++                |_, item| {
++                    assert_eq!(item, 1);
++                    entered_tx.send(()).unwrap();
++                    release_rx.recv_timeout(LIMIT).unwrap();
++                },
++                |_, _| {},
++            );
++        });
++        entered_rx.recv_timeout(LIMIT).unwrap();
++        let batch = outbox.begin_batch();
++        let _ = outbox.enqueue(&second, 2);
++        let mut delivered = vec![];
++        batch.drain(|_, item| delivered.push(item), |_, _| {});
++        assert_eq!(delivered, [2]);
++        release_tx.send(()).unwrap();
++        worker.join().unwrap();
++        assert_eq!(outbox.counts(), (0, 0, 1));
++    }
++
++    #[test]
++    fn a_producer_never_claims_an_unrelated_pending_lane() {
++        let outbox = Arc::new(DeclareOutbox::default());
++        let first = Arc::new(());
++        let second = Arc::new(());
++        let (queued_tx, queued_rx) = mpsc::channel();
++        let (release_tx, release_rx) = mpsc::channel();
++        let parked = outbox.clone();
++        let worker = thread::spawn(move || {
++            let batch = parked.begin_batch();
++            let _ = parked.enqueue(&first, 1);
++            queued_tx.send(()).unwrap();
++            // A real scheduling gap after routing unlock and before drain.
++            release_rx.recv_timeout(LIMIT).unwrap();
++            let mut delivered = vec![];
++            batch.drain(|_, item| delivered.push(item), |_, _| {});
++            assert_eq!(delivered, [1]);
++        });
++        queued_rx.recv_timeout(LIMIT).unwrap();
++        outbox.begin_batch().drain(
++            |_, _| panic!("an empty producer must never steal work"),
++            |_, _| {},
++        );
++        let batch = outbox.begin_batch();
++        let _ = outbox.enqueue(&second, 2);
++        let mut delivered = vec![];
++        batch.drain(|_, item| delivered.push(item), |_, _| {});
++        assert_eq!(delivered, [2]);
++        assert_eq!(outbox.counts(), (1, 1, 2));
++        release_tx.send(()).unwrap();
++        worker.join().unwrap();
++        assert_eq!(outbox.counts(), (0, 0, 2));
++    }
++
++    #[test]
++    fn panic_finishes_touched_lanes_and_restores_the_first_panic_without_a_stuck_owner() {
++        let outbox = DeclareOutbox::default();
++        let lane = Arc::new(());
++        let batch = outbox.begin_batch();
++        for item in [1, 2, 3] {
++            let _ = outbox.enqueue(&lane, item);
++        }
++        let mut delivered = vec![];
++        let result = catch_unwind(AssertUnwindSafe(|| {
++            batch.drain(
++                |_, item| {
++                    delivered.push(item);
++                    if item == 1 {
++                        panic!("first callback panic")
++                    }
++                    if item == 2 {
++                        panic!("second callback panic")
++                    }
++                },
++                |_, _| {},
++            );
++        }));
++        assert_eq!(delivered, [1, 2, 3]);
++        assert_eq!(
++            result.unwrap_err().downcast_ref::<&str>(),
++            Some(&"first callback panic")
++        );
++        let batch = outbox.begin_batch();
++        let _ = outbox.enqueue(&lane, 4);
++        batch.drain(|_, item| delivered.push(item), |_, _| {});
++        assert_eq!(delivered, [1, 2, 3, 4]);
++        assert_eq!(outbox.counts(), (0, 0, 3));
++    }
++
++    #[test]
++    fn diagnostic_panic_delivers_the_popped_item_and_remaining_destinations() {
++        let outbox = DeclareOutbox {
++            warning_policy: WarningPolicy {
++                owner_age: Duration::ZERO,
++                ..WarningPolicy::default()
++            },
++            ..DeclareOutbox::default()
++        };
++        let first = Arc::new(());
++        let second = Arc::new(());
++        let batch = outbox.begin_batch();
++        for item in [1, 2] {
++            let _ = outbox.enqueue(&first, item);
++        }
++        let _ = outbox.enqueue(&second, 3);
++        let mut delivered = Vec::new();
++        let result = catch_unwind(AssertUnwindSafe(|| {
++            batch.drain(
++                |_, item| delivered.push(item),
++                |_, _| panic!("diagnostic sink panic"),
++            );
++        }));
++        assert_eq!(delivered, [1, 2, 3]);
++        assert_eq!(
++            result.unwrap_err().downcast_ref::<&str>(),
++            Some(&"diagnostic sink panic")
++        );
++        assert_eq!(outbox.counts(), (0, 0, 3));
++        let next = outbox.begin_batch();
++        let _ = outbox.enqueue(&first, 4);
++        next.drain(|_, item| delivered.push(item), |_, _| {});
++        assert_eq!(delivered, [1, 2, 3, 4]);
++        assert_eq!(outbox.counts(), (0, 0, 3));
++    }
++
++    #[test]
++    fn background_dispatch_isolates_panic_and_allows_the_next_worker_iteration() {
++        let outbox = DeclareOutbox::default();
++        let lane = Arc::new(());
++        let mut delivered = vec![];
++        let mut panics = 0;
++        for iteration in 1..=2 {
++            let batch = outbox.begin_batch();
++            let _ = outbox.enqueue(&lane, iteration);
++            if batch
++                .drain_background(
++                    |_, item| {
++                        delivered.push(item);
++                        if item == 1 {
++                            panic!("callback panic in background worker")
++                        }
++                    },
++                    |_, _| {},
++                )
++                .is_err()
++            {
++                panics += 1
++            }
++        }
++        assert_eq!(delivered, [1, 2]);
++        assert_eq!(panics, 1);
++        assert_eq!(outbox.counts(), (0, 0, 1));
++    }
++
++    #[test]
++    fn an_empty_lane_releases_its_destination_after_the_inflight_send() {
++        let outbox = DeclareOutbox::default();
++        let destination = Arc::new(());
++        let weak = Arc::downgrade(&destination);
++        let batch = outbox.begin_batch();
++        let _ = outbox.enqueue(&destination, ());
++        drop(destination);
++        assert!(weak.upgrade().is_some());
++        batch.drain(|_, ()| assert!(weak.upgrade().is_some()), |_, _| {});
++        assert!(weak.upgrade().is_none());
++        assert_eq!(outbox.counts(), (0, 0, 1));
++    }
++
++    #[test]
++    fn a_concurrent_enqueue_and_reentry_survive_the_active_callback_panicking() {
++        let outbox = Arc::new(DeclareOutbox::default());
++        let destination = Arc::new(());
++        let received = Arc::new(Mutex::new(Vec::new()));
++        let (entered_tx, entered_rx) = mpsc::channel();
++        let (release_tx, release_rx) = mpsc::channel();
++        let draining = outbox.clone();
++        let recorded = received.clone();
++        let lane = destination.clone();
++        let worker = thread::spawn(move || {
++            let batch = draining.begin_batch();
++            let _ = draining.enqueue(&lane, 1);
++            catch_unwind(AssertUnwindSafe(|| {
++                batch.drain(
++                    |_, item| {
++                        recorded.lock().unwrap().push(item);
++                        if item == 1 {
++                            entered_tx.send(()).unwrap();
++                            release_rx.recv_timeout(LIMIT).unwrap();
++                            let nested = draining.begin_batch();
++                            let _ = draining.enqueue(&lane, 3);
++                            nested.drain(
++                                |_, _| panic!("reentry must not take the active lane"),
++                                |_, _| {},
++                            );
++                            panic!("active callback panic");
++                        }
++                    },
++                    |_, _| {},
++                );
++            }))
++        });
++        entered_rx.recv_timeout(LIMIT).unwrap();
++        let batch = outbox.begin_batch();
++        let _ = outbox.enqueue(&destination, 2);
++        batch.drain(
++            |_, _| panic!("the first callback still owns this lane"),
++            |_, _| {},
++        );
++        release_tx.send(()).unwrap();
++        assert!(worker.join().unwrap().is_err());
++        assert_eq!(*received.lock().unwrap(), [1, 2, 3]);
++        assert_eq!(outbox.counts(), (0, 0, 2));
++    }
++
++    #[test]
++    fn closing_a_busy_destination_drops_pending_items_after_unlock() {
++        struct Pending(mpsc::Sender<()>);
++        impl Drop for Pending {
++            fn drop(&mut self) {
++                self.0.send(()).unwrap();
++            }
++        }
++        let outbox = Arc::new(DeclareOutbox::default());
++        let destination = Arc::new(());
++        let (entered_tx, entered_rx) = mpsc::channel();
++        let (release_tx, release_rx) = mpsc::channel();
++        let (dropped_tx, dropped_rx) = mpsc::channel();
++        let draining = outbox.clone();
++        let lane = destination.clone();
++        let worker = thread::spawn(move || {
++            let batch = draining.begin_batch();
++            let _ = draining.enqueue(&lane, None::<Pending>);
++            batch.drain(
++                |_, item| {
++                    assert!(
++                        item.is_none(),
++                        "closed destinations must not receive pending work"
++                    );
++                    entered_tx.send(()).unwrap();
++                    release_rx.recv_timeout(LIMIT).unwrap();
++                },
++                |_, _| {},
++            );
++        });
++        entered_rx.recv_timeout(LIMIT).unwrap();
++        let batch = outbox.begin_batch();
++        let _ = outbox.enqueue(&destination, Some(Pending(dropped_tx)));
++        outbox.discard(&destination);
++        assert!(
++            dropped_rx.try_recv().is_err(),
++            "payload drops must be deferred past routing unlock"
++        );
++        assert_eq!(outbox.counts(), (1, 0, 1));
++        batch.drain(|_, _| panic!("closed queue is empty"), |_, _| {});
++        dropped_rx.recv_timeout(LIMIT).unwrap();
++        release_tx.send(()).unwrap();
++        worker.join().unwrap();
++        assert_eq!(outbox.counts(), (0, 0, 1));
++    }
++
++    #[test]
++    fn a_retired_idle_lane_cannot_be_stolen_or_retain_its_destination() {
++        let outbox = DeclareOutbox::default();
++        let destination = Arc::new(());
++        let weak = Arc::downgrade(&destination);
++        let pending = outbox.begin_batch();
++        let _ = outbox.enqueue(&destination, 1);
++        let closing = outbox.begin_batch();
++        outbox.discard(&destination);
++        closing.drain(
++            |_, _| panic!("a close batch cannot revive retired work"),
++            |_, _| {},
++        );
++        drop(destination);
++        assert!(
++            weak.upgrade().is_some(),
++            "the original batch prevents address reuse"
++        );
++        pending.drain(
++            |_, _| panic!("the original batch sees an absent lane"),
++            |_, _| {},
++        );
++        assert!(weak.upgrade().is_none());
++        assert_eq!(outbox.counts(), (0, 0, 1));
++    }
++
++    #[test]
++    fn production_counters_warn_at_backlog_threshold_and_rate_limit() {
++        let outbox = DeclareOutbox {
++            warning_policy: WarningPolicy {
++                pending: 2,
++                ..WarningPolicy::default()
++            },
++            ..DeclareOutbox::default()
++        };
++        let destination = Arc::new(());
++        let batch = outbox.begin_batch();
++        assert!(outbox.enqueue(&destination, 1).is_none());
++        let warning = outbox.enqueue(&destination, 2).unwrap();
++        assert_eq!((warning.lane_pending, warning.lane_high_water), (2, 2));
++        assert_eq!((warning.total_pending, warning.total_high_water), (2, 2));
++        assert_eq!(warning.owner_age, Duration::ZERO);
++        assert_eq!(warning.destination, Arc::as_ptr(&destination) as usize);
++        assert!(
++            outbox.enqueue(&destination, 3).is_none(),
++            "warnings are rate limited across the outbox"
++        );
++        batch.drain(|_, _| {}, |_, _| panic!("rate limit also covers draining"));
++        assert_eq!(outbox.counts(), (0, 0, 3));
++        let recreated = outbox.begin_batch();
++        for item in [4, 5] {
++            assert!(
++                outbox.enqueue(&destination, item).is_none(),
++                "removing and recreating a lane must not reset the warning interval"
++            );
++        }
++        recreated.drain(
++            |_, _| {},
++            |_, _| panic!("recreated lanes share the warning interval"),
++        );
++        assert_eq!(outbox.counts(), (0, 0, 3));
++    }
++
++    #[test]
++    fn owner_age_is_reported_by_production_observability() {
++        let outbox = DeclareOutbox {
++            warning_policy: WarningPolicy {
++                owner_age: Duration::ZERO,
++                ..WarningPolicy::default()
++            },
++            ..DeclareOutbox::default()
++        };
++        let destination = Arc::new(());
++        let batch = outbox.begin_batch();
++        assert!(outbox.enqueue(&destination, 1).is_none());
++        let mut notices = vec![];
++        batch.drain(|_, _| {}, |_, notice| notices.push(notice));
++        assert_eq!(notices.len(), 1);
++        assert_eq!(notices[0].lane_pending, 1);
++    }
++
++    #[test]
++    fn concurrent_producers_converge_after_a_blocked_callback_and_report_high_water() {
++        let outbox = Arc::new(DeclareOutbox::default());
++        let lane = Arc::new(());
++        let received = Arc::new(Mutex::new(Vec::new()));
++        let (entered_tx, entered_rx) = mpsc::channel();
++        let (release_tx, release_rx) = mpsc::channel();
++        let draining = outbox.clone();
++        let recorded = received.clone();
++        let first_lane = lane.clone();
++        let worker = thread::spawn(move || {
++            let batch = draining.begin_batch();
++            let _ = draining.enqueue(&first_lane, (usize::MAX, 0));
++            batch.drain(
++                |_, item| {
++                    if item.0 == usize::MAX {
++                        entered_tx.send(()).unwrap();
++                        release_rx.recv_timeout(LIMIT).unwrap();
++                    } else {
++                        recorded.lock().unwrap().push(item);
++                    }
++                },
++                |_, _| {},
++            );
++        });
++        entered_rx.recv_timeout(LIMIT).unwrap();
++        let control = Mutex::new(());
++        let expected = Mutex::new(Vec::new());
++        thread::scope(|scope| {
++            for producer in 0..4 {
++                let (outbox, control, expected, lane) = (&outbox, &control, &expected, &lane);
++                scope.spawn(move || {
++                    for sequence in 0..2_000 {
++                        let batch = outbox.begin_batch();
++                        {
++                            let _control = control.lock().unwrap();
++                            let _ = outbox.enqueue(lane, (producer, sequence));
++                            expected.lock().unwrap().push((producer, sequence));
++                        }
++                        batch.drain(
++                            |_, _| panic!("the other thread still owns this lane"),
++                            |_, _| {},
++                        );
++                    }
++                });
++            }
++        });
++        assert_eq!(outbox.counts(), (1, 8_000, 8_000));
++        release_tx.send(()).unwrap();
++        worker.join().unwrap();
++        assert_eq!(*received.lock().unwrap(), *expected.lock().unwrap());
++        assert_eq!(outbox.counts(), (0, 0, 8_000));
++        eprintln!("routing_outbox pressure: high_water=8000 pending=0 lanes=0 delivered=8000");
++    }
++}
+diff --git a/vendor/zenoh/src/net/routing/dispatcher/face.rs b/vendor/zenoh/src/net/routing/dispatcher/face.rs
+index 2dcdfbb..aff658f 100644
+--- a/vendor/zenoh/src/net/routing/dispatcher/face.rs
++++ b/vendor/zenoh/src/net/routing/dispatcher/face.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ use std::{
+     any::Any,
+     collections::HashMap,
+@@ -543,20 +544,18 @@ impl Face {
+ 
+ impl Primitives for Face {
+     fn send_interest(&self, msg: &mut zenoh_protocol::network::Interest) {
++        let _drain = self.tables.declarations.drain_after();
+         let ctrl_lock = zlock!(self.tables.ctrl_lock);
+         if msg.mode != InterestMode::Final {
+-            let mut declares = vec![];
+-            self.interest(msg, &mut |p, m| declares.push((p.clone(), m)));
++            self.interest(msg, &mut |p, m| self.tables.declarations.enqueue(p, m));
+             drop(ctrl_lock);
+-            for (p, m) in declares {
+-                m.with_mut(|m| p.send_declare(m));
+-            }
+         } else {
+             self.interest_final(msg);
+         }
+     }
+ 
+     fn send_declare(&self, msg: &mut zenoh_protocol::network::Declare) {
++        let _drain = self.tables.declarations.drain_after();
+         let ctrl_lock = zlock!(self.tables.ctrl_lock);
+         match &mut msg.body {
+             zenoh_protocol::network::DeclareBody::DeclareKeyExpr(m) => {
+@@ -566,85 +565,61 @@ impl Primitives for Face {
+                 unregister_expr(&self.tables, &mut self.state.clone(), m.id);
+             }
+             zenoh_protocol::network::DeclareBody::DeclareSubscriber(m) => {
+-                let mut declares = vec![];
+                 self.declare_subscriber(
+                     m.id,
+                     &m.wire_expr,
+                     &SubscriberInfo,
+                     msg.ext_nodeid.node_id,
+-                    &mut |p, m| declares.push((p.clone(), m)),
++                    &mut |p, m| self.tables.declarations.enqueue(p, m),
+                 );
+                 drop(ctrl_lock);
+-                for (p, m) in declares {
+-                    m.with_mut(|m| p.send_declare(m));
+-                }
+             }
+             zenoh_protocol::network::DeclareBody::UndeclareSubscriber(m) => {
+-                let mut declares = vec![];
+                 self.undeclare_subscriber(
+                     m.id,
+                     &m.ext_wire_expr.wire_expr,
+                     msg.ext_nodeid.node_id,
+-                    &mut |p, m| declares.push((p.clone(), m)),
++                    &mut |p, m| self.tables.declarations.enqueue(p, m),
+                 );
+                 drop(ctrl_lock);
+-                for (p, m) in declares {
+-                    m.with_mut(|m| p.send_declare(m));
+-                }
+             }
+             zenoh_protocol::network::DeclareBody::DeclareQueryable(m) => {
+-                let mut declares = vec![];
+                 self.declare_queryable(
+                     m.id,
+                     &m.wire_expr,
+                     &m.ext_info,
+                     msg.ext_nodeid.node_id,
+-                    &mut |p, m| declares.push((p.clone(), m)),
++                    &mut |p, m| self.tables.declarations.enqueue(p, m),
+                 );
+                 drop(ctrl_lock);
+-                for (p, m) in declares {
+-                    m.with_mut(|m| p.send_declare(m));
+-                }
+             }
+             zenoh_protocol::network::DeclareBody::UndeclareQueryable(m) => {
+-                let mut declares = vec![];
+                 self.undeclare_queryable(
+                     m.id,
+                     &m.ext_wire_expr.wire_expr,
+                     msg.ext_nodeid.node_id,
+-                    &mut |p, m| declares.push((p.clone(), m)),
++                    &mut |p, m| self.tables.declarations.enqueue(p, m),
+                 );
+                 drop(ctrl_lock);
+-                for (p, m) in declares {
+-                    m.with_mut(|m| p.send_declare(m));
+-                }
+             }
+             zenoh_protocol::network::DeclareBody::DeclareToken(m) => {
+-                let mut declares = vec![];
+                 self.declare_token(
+                     m.id,
+                     &m.wire_expr,
+                     msg.ext_nodeid.node_id,
+                     msg.interest_id,
+-                    &mut |p, m| declares.push((p.clone(), m)),
++                    &mut |p, m| self.tables.declarations.enqueue(p, m),
+                 );
+                 drop(ctrl_lock);
+-                for (p, m) in declares {
+-                    m.with_mut(|m| p.send_declare(m));
+-                }
+             }
+             zenoh_protocol::network::DeclareBody::UndeclareToken(m) => {
+-                let mut declares = vec![];
+                 self.undeclare_token(
+                     m.id,
+                     &m.ext_wire_expr,
+                     msg.ext_nodeid.node_id,
+-                    &mut |p, m| declares.push((p.clone(), m)),
++                    &mut |p, m| self.tables.declarations.enqueue(p, m),
+                 );
+                 drop(ctrl_lock);
+-                for (p, m) in declares {
+-                    m.with_mut(|m| p.send_declare(m));
+-                }
+             }
+             zenoh_protocol::network::DeclareBody::DeclareFinal(_) => {
+                 let Some(id) = msg.interest_id else {
+@@ -653,16 +628,12 @@ impl Primitives for Face {
+                 };
+ 
+                 let mut wtables = zwrite!(self.tables.tables);
+-                let mut declares = vec![];
+                 self.declare_final(&mut wtables, id, msg.ext_nodeid.node_id, &mut |p, m| {
+-                    declares.push((p.clone(), m))
++                    self.tables.declarations.enqueue(p, m)
+                 });
+ 
+                 drop(wtables);
+                 drop(ctrl_lock);
+-                for (p, m) in declares {
+-                    m.with_mut(|m| p.send_declare(m));
+-                }
+             }
+         }
+     }
+@@ -706,10 +677,10 @@ impl Primitives for Face {
+         let mut state = self.state.clone();
+         state.task_controller.terminate_all(Duration::from_secs(10));
+         finalize_pending_queries(&self.tables, &mut state);
+-        let mut declares = vec![];
++        let _drain = self.tables.declarations.drain_after();
+         let ctrl_lock = zlock!(self.tables.ctrl_lock);
+         finalize_pending_interests(&self.tables, &mut state, &mut |p, m| {
+-            declares.push((p.clone(), m))
++            self.tables.declarations.enqueue(p, m)
+         });
+         let mut wtables = zwrite!(self.tables.tables);
+         let tables = &mut *wtables;
+@@ -718,7 +689,7 @@ impl Primitives for Face {
+             tables_lock: &self.tables,
+             tables: &mut tables.data,
+             src_face: &mut state,
+-            send_declare: &mut |p, m| declares.push((p.clone(), m)),
++            send_declare: &mut |p, m| self.tables.declarations.enqueue(p, m),
+         };
+ 
+         let hats = &mut tables.hats;
+@@ -824,11 +795,13 @@ impl Primitives for Face {
+ 
+         tables.data.faces.remove(&src_fid);
+ 
++        // All producers share ctrl_lock: the removed face cannot receive new
++        // routing declarations. Pending work for this destination is useless;
++        // retain only its in-flight callback, and defer payload drops to drain.
++        self.tables.declarations.discard(&self.state.primitives);
++
+         drop(wtables);
+         drop(ctrl_lock);
+-        for (p, m) in declares {
+-            m.with_mut(|m| p.send_declare(m));
+-        }
+     }
+ 
+     fn as_any(&self) -> &dyn Any {
+diff --git a/vendor/zenoh/src/net/routing/dispatcher/interests.rs b/vendor/zenoh/src/net/routing/dispatcher/interests.rs
+index 94c19c0..a0858d6 100644
+--- a/vendor/zenoh/src/net/routing/dispatcher/interests.rs
++++ b/vendor/zenoh/src/net/routing/dispatcher/interests.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ 
+ use std::{
+     collections::{HashMap, HashSet},
+@@ -156,12 +157,12 @@ impl CurrentInterestCleanup {
+ 
+     async fn execute(&mut self, print_warning: bool) {
+         if let Some(mut face) = self.face.upgrade() {
+-            let ctrl_lock = zlock!(self.tables.ctrl_lock);
++            let _drain = self.tables.declarations.drain_after_background();
++            let _ctrl_lock = zlock!(self.tables.ctrl_lock);
+             if let Some(interest) = get_mut_unchecked(&mut face)
+                 .pending_current_interests
+                 .remove(&self.id)
+             {
+-                drop(ctrl_lock);
+                 if print_warning {
+                     tracing::warn!(
+                         "{}:{} Didn't receive DeclareFinal for interest {:?}:{}: Timeout({:#?})!",
+@@ -173,9 +174,7 @@ impl CurrentInterestCleanup {
+                     );
+                 }
+                 finalize_pending_interest(interest, &mut |p, m| {
+-                    m.with_mut(|m| {
+-                        p.send_declare(m);
+-                    })
++                    self.tables.declarations.enqueue(p, m)
+                 });
+             }
+         }
+@@ -354,7 +353,7 @@ impl Face {
+             tables_lock: &self.tables,
+             tables: &mut tables.data,
+             src_face: &mut self.state.clone(),
+-            send_declare: &mut |_, _| unreachable!(),
++            send_declare: &mut |p, m| self.tables.declarations.enqueue(p, m),
+         };
+ 
+         // Unregister keyexpr interest
+diff --git a/vendor/zenoh/src/net/routing/dispatcher/mod.rs b/vendor/zenoh/src/net/routing/dispatcher/mod.rs
+index ab758c0..f659060 100644
+--- a/vendor/zenoh/src/net/routing/dispatcher/mod.rs
++++ b/vendor/zenoh/src/net/routing/dispatcher/mod.rs
+@@ -11,12 +11,14 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ 
+ //! ⚠️ WARNING ⚠️
+ //!
+ //! This module is intended for Zenoh's internal use.
+ //!
+ //! [Click here for Zenoh's documentation](https://docs.rs/zenoh/latest/zenoh)
++mod declare_outbox;
+ pub mod face;
+ pub mod interests;
+ pub mod local_resources;
+diff --git a/vendor/zenoh/src/net/routing/dispatcher/tables.rs b/vendor/zenoh/src/net/routing/dispatcher/tables.rs
+index 12fe09e..4c986fe 100644
+--- a/vendor/zenoh/src/net/routing/dispatcher/tables.rs
++++ b/vendor/zenoh/src/net/routing/dispatcher/tables.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ use std::{
+     borrow::Cow,
+     cell::OnceCell,
+@@ -28,21 +29,132 @@ use zenoh_config::{unwrap_or_default, Config};
+ use zenoh_keyexpr::keyexpr;
+ use zenoh_protocol::{
+     core::{Bound, ExprId, Region, WireExpr, ZenohIdProto},
+-    network::Mapping,
++    network::{Declare, Mapping},
+ };
+ use zenoh_result::ZResult;
+ 
+-use super::face::FaceState;
+ pub use super::resource::*;
++use super::{
++    declare_outbox::{DeclarationBatch, DeclareOutbox, QueueWarning},
++    face::FaceState,
++};
+ use crate::net::{
++    primitives::{DummyPrimitives, EPrimitives, McastMux, Mux},
+     routing::{
+         dispatcher::{face::FaceId, region::RegionMap},
+         hat::{HatTrait, Sources},
+         interceptor::{interceptor_factories, InterceptorFactory},
++        RoutingContext,
+     },
+     runtime::WeakRuntime,
+ };
+ 
++// Session re-exports this marker; a history-only routing tree lacks it.
++pub(crate) const AOS_ROUTING_DECLARATIONS_PATCH_VERSION: u32 = 2;
++
++#[derive(Default)]
++pub(crate) struct RoutingDeclarations(
++    DeclareOutbox<dyn EPrimitives + Send + Sync, RoutingContext<Declare>>,
++);
++
++impl RoutingDeclarations {
++    #[cfg(test)]
++    pub(crate) fn batch_starts(&self) -> usize {
++        self.0.batch_starts()
++    }
++
++    pub(crate) fn enqueue(
++        &self,
++        destination: &Arc<dyn EPrimitives + Send + Sync>,
++        declaration: RoutingContext<Declare>,
++    ) {
++        if let Some(warning) = self.0.enqueue(destination, declaration) {
++            report_declaration_backlog(destination, warning);
++        }
++    }
++
++    pub(crate) fn discard(&self, destination: &Arc<dyn EPrimitives + Send + Sync>) {
++        self.0.discard(destination);
++    }
++
++    /// Declare this guard before acquiring routing locks. Rust drops later
++    /// locals first, including on early return, so callbacks run after unlock.
++    pub(crate) fn drain_after(&self) -> DrainDeclarations<'_> {
++        DrainDeclarations {
++            batch: Some(self.0.begin_batch()),
++        }
++    }
++
++    /// Background workers must survive a user callback panic. This changes
++    /// only dispatch-panic propagation, not producer/routing mutation panics.
++    pub(crate) fn drain_after_background(&self) -> DrainDeclarations<'_> {
++        DrainDeclarations {
++            batch: Some(self.0.begin_background_batch()),
++        }
++    }
++}
++
++fn report_declaration_backlog(
++    destination: &Arc<dyn EPrimitives + Send + Sync>,
++    warning: QueueWarning,
++) {
++    let primitive = destination.as_any();
++    let (destination_type, face) = if let Some(mux) = primitive.downcast_ref::<Mux>() {
++        ("Mux", mux.face.get().and_then(|face| face.state.upgrade()))
++    } else if let Some(mux) = primitive.downcast_ref::<McastMux>() {
++        ("McastMux", mux.face.get().map(|face| face.state.clone()))
++    } else if primitive.is::<crate::api::session::WeakSession>() {
++        ("WeakSession", None)
++    } else if primitive.is::<crate::net::routing::namespace::ENamespace>() {
++        ("ENamespace", None)
++    } else if primitive.is::<DummyPrimitives>() {
++        ("DummyPrimitives", None)
++    } else {
++        ("unknown EPrimitives", None)
++    };
++    tracing::warn!(
++        target: "zenoh::routing::declare_queue",
++        destination = warning.destination,
++        destination_type,
++        face_id = ?face.as_ref().map(|face| face.id),
++        zid = ?face.as_ref().map(|face| face.zid),
++        pending = warning.lane_pending,
++        high_water = warning.lane_high_water,
++        owner_held_ms = warning.owner_age.as_millis() as u64,
++        total_pending = warning.total_pending,
++        total_high_water = warning.total_high_water,
++        "routing declaration queue is delayed; inspect the destination callback or transport"
++    );
++}
++
++pub(crate) struct DrainDeclarations<'a> {
++    batch: Option<DeclarationBatch<'a, dyn EPrimitives + Send + Sync, RoutingContext<Declare>>>,
++}
++
++impl Drop for DrainDeclarations<'_> {
++    fn drop(&mut self) {
++        let Some(batch) = self.batch.take() else {
++            return;
++        };
++        let send = |destination: &Arc<dyn EPrimitives + Send + Sync>,
++                    declaration: RoutingContext<Declare>| {
++            declaration.with_mut(|message| destination.send_declare(message));
++        };
++        // Keep dispatch responsibility during unwinding (e.g. Subscriber Drop).
++        // drain_in_scope catches a second panic, and inherits a transport
++        // background boundary through any nested Face production scopes.
++        if let Err(panic) = batch.drain_in_scope(send, report_declaration_backlog) {
++            let message = panic
++                .downcast_ref::<&str>()
++                .copied()
++                .or_else(|| panic.downcast_ref::<String>().map(String::as_str))
++                .unwrap_or("non-string panic payload");
++            tracing::error!(target: "zenoh::routing::declare_queue", panic = message,
++                "routing declaration callback panicked; dispatch completed within an isolated boundary");
++        }
++    }
++}
++
+ pub(crate) struct RoutingExpr<'a> {
+     prefix: &'a Arc<Resource>,
+     suffix: &'a str,
+@@ -120,6 +232,7 @@ impl<'a> RoutingExpr<'a> {
+ }
+ 
+ pub(crate) struct TablesData {
++    pub(crate) declarations: Arc<RoutingDeclarations>,
+     pub(crate) zid: ZenohIdProto,
+     pub(crate) runtime: Option<WeakRuntime>,
+     #[allow(dead_code)]
+@@ -193,6 +306,7 @@ impl TablesData {
+         );
+ 
+         Ok(TablesData {
++            declarations: Arc::new(RoutingDeclarations::default()),
+             zid,
+             runtime: None,
+             hlc,
+@@ -266,6 +380,7 @@ pub struct TablesLock {
+     pub tables: RwLock<Tables>,
+     pub(crate) ctrl_lock: Mutex<()>,
+     pub(crate) queries_lock: RwLock<()>,
++    pub(crate) declarations: Arc<RoutingDeclarations>,
+ }
+ 
+ /// Gateway state.
+diff --git a/vendor/zenoh/src/net/routing/gateway.rs b/vendor/zenoh/src/net/routing/gateway.rs
+index 43b1009..66ec94a 100644
+--- a/vendor/zenoh/src/net/routing/gateway.rs
++++ b/vendor/zenoh/src/net/routing/gateway.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ use std::{
+     str::FromStr,
+     sync::{atomic::Ordering, Arc, Mutex, RwLock},
+@@ -190,6 +191,7 @@ impl<'conf> GatewayBuilder<'conf> {
+ 
+         Ok(Gateway {
+             tables: Arc::new(TablesLock {
++                declarations: data.declarations.clone(),
+                 tables: RwLock::new(Tables { data, hats }),
+                 ctrl_lock: Mutex::new(()),
+                 queries_lock: RwLock::new(()),
+@@ -205,6 +207,7 @@ pub struct Gateway {
+ 
+ impl Gateway {
+     pub fn init_hats(&mut self, runtime: Runtime) -> ZResult<()> {
++        let _drain = self.tables.declarations.drain_after();
+         let _ctrl_lock = zlock!(self.tables.ctrl_lock);
+         let mut wtables = zwrite!(self.tables.tables);
+         let tables = &mut *wtables;
+@@ -218,6 +221,7 @@ impl Gateway {
+     }
+ 
+     pub(crate) fn new_session(&self, primitives: Arc<dyn EPrimitives + Send + Sync>) -> Arc<Face> {
++        let _drain = self.tables.declarations.drain_after();
+         let ctrl_lock = zlock!(self.tables.ctrl_lock);
+         let mut wtables = zwrite!(self.tables.tables);
+         let tables = &mut *wtables;
+@@ -248,9 +252,7 @@ impl Gateway {
+                     tables_lock: &face.tables,
+                     tables: &mut tables.data,
+                     src_face: &mut face.state,
+-                    send_declare: &mut |_, _| {
+-                        unreachable!("no declarations should be pushed to new session faces")
+-                    },
++                    send_declare: &mut |p, m| self.tables.declarations.enqueue(p, m),
+                 },
+                 &self.tables,
+             )
+@@ -267,6 +269,7 @@ impl Gateway {
+         region: Region,
+         remote_bound: Bound,
+     ) -> ZResult<Arc<DeMux>> {
++        let _drain = self.tables.declarations.drain_after_background();
+         let ctrl_lock = zlock!(self.tables.ctrl_lock);
+         let mut wtables = zwrite!(self.tables.tables);
+         let tables = &mut *wtables;
+@@ -324,7 +327,6 @@ impl Gateway {
+ 
+         let _ = mux.face.set(Face::downgrade(&face));
+ 
+-        let mut declares = vec![];
+         let (owner_hat, other_hats) = tables
+             .hats
+             .partition_mut(&region)
+@@ -333,7 +335,7 @@ impl Gateway {
+             tables_lock: &face.tables,
+             tables: &mut tables.data,
+             src_face: &mut face.state,
+-            send_declare: &mut |p, m| declares.push((p.clone(), m)),
++            send_declare: &mut |p, m| self.tables.declarations.enqueue(p, m),
+         };
+         owner_hat.new_transport_unicast_face(
+             ctx,
+@@ -342,9 +344,6 @@ impl Gateway {
+         )?;
+         drop(wtables);
+         drop(ctrl_lock);
+-        for (p, m) in declares {
+-            m.with_mut(|m| p.send_declare(m));
+-        }
+ 
+         Ok(Arc::new(DeMux::new(
+             face,
+@@ -359,6 +358,7 @@ impl Gateway {
+         transport: TransportMulticast,
+         region: Region,
+     ) -> ZResult<()> {
++        let _drain = self.tables.declarations.drain_after_background();
+         let _ctrl_lock = zlock!(self.tables.ctrl_lock);
+         let mut wtables = zwrite!(self.tables.tables);
+         let tables = &mut *wtables;
+@@ -413,6 +413,7 @@ impl Gateway {
+         region: Region,
+         remote_bound: Bound,
+     ) -> ZResult<Arc<DeMux>> {
++        let _drain = self.tables.declarations.drain_after_background();
+         let _ctrl_lock = zlock!(self.tables.ctrl_lock);
+         let mut wtables = zwrite!(self.tables.tables);
+         let tables = &mut *wtables;
+diff --git a/vendor/zenoh/src/net/routing/hat/router/mod.rs b/vendor/zenoh/src/net/routing/hat/router/mod.rs
+index 3d1bd70..137c0ec 100644
+--- a/vendor/zenoh/src/net/routing/hat/router/mod.rs
++++ b/vendor/zenoh/src/net/routing/hat/router/mod.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ 
+ //! ⚠️ WARNING ⚠️
+ //!
+@@ -84,6 +85,8 @@ impl TreesComputationWorker {
+                 .await;
+ 
+                 if let Ok(tables_ref) = rx.recv_async().await {
++                    let _drain = tables_ref.declarations.drain_after_background();
++                    let _ctrl_lock = zlock!(tables_ref.ctrl_lock);
+                     let mut wtables = zwrite!(tables_ref.tables);
+                     let tables = &mut *wtables;
+ 
+diff --git a/vendor/zenoh/src/net/routing/hat/router/pubsub.rs b/vendor/zenoh/src/net/routing/hat/router/pubsub.rs
+index 5dffc6e..a885202 100644
+--- a/vendor/zenoh/src/net/routing/hat/router/pubsub.rs
++++ b/vendor/zenoh/src/net/routing/hat/router/pubsub.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ use std::{
+     borrow::Cow,
+     collections::{HashMap, HashSet},
+@@ -102,19 +103,22 @@ impl Hat {
+                             let key_expr = Resource::decl_key(res, &mut someface);
+ 
+                             tracing::debug!(dst = %someface);
+-                            someface.primitives.send_declare(RoutingContext::with_expr(
+-                                &mut Declare {
+-                                    interest_id: None,
+-                                    ext_qos: ext::QoSType::DECLARE,
+-                                    ext_tstamp: None,
+-                                    ext_nodeid: ext::NodeIdType { node_id },
+-                                    body: DeclareBody::DeclareSubscriber(DeclareSubscriber {
+-                                        id: SubscriberId::default(), // Sourced subscribers do not use ids
+-                                        wire_expr: key_expr,
+-                                    }),
+-                                },
+-                                res.expr().to_string(),
+-                            ));
++                            tables.declarations.enqueue(
++                                &someface.primitives,
++                                RoutingContext::with_expr(
++                                    Declare {
++                                        interest_id: None,
++                                        ext_qos: ext::QoSType::DECLARE,
++                                        ext_tstamp: None,
++                                        ext_nodeid: ext::NodeIdType { node_id },
++                                        body: DeclareBody::DeclareSubscriber(DeclareSubscriber {
++                                            id: SubscriberId::default(), // Sourced subscribers do not use ids
++                                            wire_expr: key_expr,
++                                        }),
++                                    },
++                                    res.expr().to_string(),
++                                ),
++                            );
+                         }
+                     }
+                     None => {
+@@ -183,21 +187,26 @@ impl Hat {
+                             let wire_expr = Resource::decl_key(res, &mut someface);
+ 
+                             tracing::debug!(dst = %someface);
+-                            someface.primitives.send_declare(RoutingContext::with_expr(
+-                                &mut Declare {
+-                                    interest_id: None,
+-                                    ext_qos: ext::QoSType::DECLARE,
+-                                    ext_tstamp: None,
+-                                    ext_nodeid: ext::NodeIdType {
+-                                        node_id: routing_context.unwrap_or(0),
++                            tables.declarations.enqueue(
++                                &someface.primitives,
++                                RoutingContext::with_expr(
++                                    Declare {
++                                        interest_id: None,
++                                        ext_qos: ext::QoSType::DECLARE,
++                                        ext_tstamp: None,
++                                        ext_nodeid: ext::NodeIdType {
++                                            node_id: routing_context.unwrap_or(0),
++                                        },
++                                        body: DeclareBody::UndeclareSubscriber(
++                                            UndeclareSubscriber {
++                                                id: SubscriberId::default(), // Sourced subscribers do not use ids
++                                                ext_wire_expr: WireExprType { wire_expr },
++                                            },
++                                        ),
+                                     },
+-                                    body: DeclareBody::UndeclareSubscriber(UndeclareSubscriber {
+-                                        id: SubscriberId::default(), // Sourced subscribers do not use ids
+-                                        ext_wire_expr: WireExprType { wire_expr },
+-                                    }),
+-                                },
+-                                res.expr().to_string(),
+-                            ));
++                                    res.expr().to_string(),
++                                ),
++                            );
+                         }
+                     }
+                     None => {
+diff --git a/vendor/zenoh/src/net/routing/hat/router/queries.rs b/vendor/zenoh/src/net/routing/hat/router/queries.rs
+index 64571cd..43e39eb 100644
+--- a/vendor/zenoh/src/net/routing/hat/router/queries.rs
++++ b/vendor/zenoh/src/net/routing/hat/router/queries.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ use std::{borrow::Cow, collections::HashMap, sync::Arc};
+ 
+ use petgraph::graph::NodeIndex;
+@@ -99,22 +100,25 @@ impl Hat {
+                         {
+                             let key_expr = Resource::decl_key(res, &mut someface);
+                             tracing::debug!(dst = %someface);
+-                            someface.primitives.send_declare(RoutingContext::with_expr(
+-                                &mut Declare {
+-                                    interest_id: None,
+-                                    ext_qos: declare::ext::QoSType::DECLARE,
+-                                    ext_tstamp: None,
+-                                    ext_nodeid: declare::ext::NodeIdType {
+-                                        node_id: routing_context,
++                            tables.declarations.enqueue(
++                                &someface.primitives,
++                                RoutingContext::with_expr(
++                                    Declare {
++                                        interest_id: None,
++                                        ext_qos: declare::ext::QoSType::DECLARE,
++                                        ext_tstamp: None,
++                                        ext_nodeid: declare::ext::NodeIdType {
++                                            node_id: routing_context,
++                                        },
++                                        body: DeclareBody::DeclareQueryable(DeclareQueryable {
++                                            id: QueryableId::default(), // Sourced queryables do not use ids
++                                            wire_expr: key_expr,
++                                            ext_info: *qabl_info,
++                                        }),
+                                     },
+-                                    body: DeclareBody::DeclareQueryable(DeclareQueryable {
+-                                        id: QueryableId::default(), // Sourced queryables do not use ids
+-                                        wire_expr: key_expr,
+-                                        ext_info: *qabl_info,
+-                                    }),
+-                                },
+-                                res.expr().to_string(),
+-                            ));
++                                    res.expr().to_string(),
++                                ),
++                            );
+                         }
+                     }
+                     None => {
+@@ -183,21 +187,24 @@ impl Hat {
+                             let wire_expr = Resource::decl_key(res, &mut someface);
+ 
+                             tracing::debug!(dst = %someface);
+-                            someface.primitives.send_declare(RoutingContext::with_expr(
+-                                &mut Declare {
+-                                    interest_id: None,
+-                                    ext_qos: declare::ext::QoSType::DECLARE,
+-                                    ext_tstamp: None,
+-                                    ext_nodeid: declare::ext::NodeIdType {
+-                                        node_id: routing_context,
++                            tables.declarations.enqueue(
++                                &someface.primitives,
++                                RoutingContext::with_expr(
++                                    Declare {
++                                        interest_id: None,
++                                        ext_qos: declare::ext::QoSType::DECLARE,
++                                        ext_tstamp: None,
++                                        ext_nodeid: declare::ext::NodeIdType {
++                                            node_id: routing_context,
++                                        },
++                                        body: DeclareBody::UndeclareQueryable(UndeclareQueryable {
++                                            id: QueryableId::default(), // Sourced queryables do not use ids
++                                            ext_wire_expr: WireExprType { wire_expr },
++                                        }),
+                                     },
+-                                    body: DeclareBody::UndeclareQueryable(UndeclareQueryable {
+-                                        id: QueryableId::default(), // Sourced queryables do not use ids
+-                                        ext_wire_expr: WireExprType { wire_expr },
+-                                    }),
+-                                },
+-                                res.expr().to_string(),
+-                            ));
++                                    res.expr().to_string(),
++                                ),
++                            );
+                         }
+                     }
+                     None => {
+diff --git a/vendor/zenoh/src/net/routing/hat/router/token.rs b/vendor/zenoh/src/net/routing/hat/router/token.rs
+index 215239d..0bfe814 100644
+--- a/vendor/zenoh/src/net/routing/hat/router/token.rs
++++ b/vendor/zenoh/src/net/routing/hat/router/token.rs
+@@ -11,6 +11,7 @@
+ // Contributors:
+ //   ZettaScale Zenoh Team, <zenoh@zettascale.tech>
+ //
++// AOS modification: preserve routing declaration order with an unlocked FIFO drain.
+ 
+ use std::{
+     collections::{HashMap, HashSet},
+@@ -95,21 +96,24 @@ impl Hat {
+                         {
+                             let key_expr = Resource::decl_key(res, &mut someface);
+                             tracing::debug!(dst = %someface);
+-                            someface.primitives.send_declare(RoutingContext::with_expr(
+-                                &mut Declare {
+-                                    interest_id: None,
+-                                    ext_qos: ext::QoSType::DECLARE,
+-                                    ext_tstamp: None,
+-                                    ext_nodeid: ext::NodeIdType {
+-                                        node_id: routing_context,
++                            tables.declarations.enqueue(
++                                &someface.primitives,
++                                RoutingContext::with_expr(
++                                    Declare {
++                                        interest_id: None,
++                                        ext_qos: ext::QoSType::DECLARE,
++                                        ext_tstamp: None,
++                                        ext_nodeid: ext::NodeIdType {
++                                            node_id: routing_context,
++                                        },
++                                        body: DeclareBody::DeclareToken(DeclareToken {
++                                            id: TokenId::default(), // Sourced tokens do not use ids
++                                            wire_expr: key_expr,
++                                        }),
+                                     },
+-                                    body: DeclareBody::DeclareToken(DeclareToken {
+-                                        id: TokenId::default(), // Sourced tokens do not use ids
+-                                        wire_expr: key_expr,
+-                                    }),
+-                                },
+-                                res.expr().to_string(),
+-                            ));
++                                    res.expr().to_string(),
++                                ),
++                            );
+                         } else {
+                             tracing::trace!(
+                                 face = %someface,
+@@ -191,21 +195,24 @@ impl Hat {
+                             let wire_expr = Resource::decl_key(res, &mut someface);
+ 
+                             tracing::debug!(dst = %someface);
+-                            someface.primitives.send_declare(RoutingContext::with_expr(
+-                                &mut Declare {
+-                                    interest_id: None,
+-                                    ext_qos: ext::QoSType::DECLARE,
+-                                    ext_tstamp: None,
+-                                    ext_nodeid: ext::NodeIdType {
+-                                        node_id: routing_context.unwrap_or(0),
++                            tables.declarations.enqueue(
++                                &someface.primitives,
++                                RoutingContext::with_expr(
++                                    Declare {
++                                        interest_id: None,
++                                        ext_qos: ext::QoSType::DECLARE,
++                                        ext_tstamp: None,
++                                        ext_nodeid: ext::NodeIdType {
++                                            node_id: routing_context.unwrap_or(0),
++                                        },
++                                        body: DeclareBody::UndeclareToken(UndeclareToken {
++                                            id: TokenId::default(), // Sourced tokens do not use ids
++                                            ext_wire_expr: WireExprType { wire_expr },
++                                        }),
+                                     },
+-                                    body: DeclareBody::UndeclareToken(UndeclareToken {
+-                                        id: TokenId::default(), // Sourced tokens do not use ids
+-                                        ext_wire_expr: WireExprType { wire_expr },
+-                                    }),
+-                                },
+-                                res.expr().to_string(),
+-                            ));
++                                    res.expr().to_string(),
++                                ),
++                            );
+                         }
+                     }
+                     None => {

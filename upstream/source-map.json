@@ -1,0 +1,328 @@
+[
+  {
+    "id": "SRC-12",
+    "repository": "hiroz",
+    "commit": "d9f979a0404311de12f6884bafaa9b20600eb490",
+    "branch_or_version": "main snapshot",
+    "path": "crates/hiroz/src/context.rs",
+    "line": 673,
+    "url": "https://github.com/ZettaScaleLabs/hiroz/blob/d9f979a0404311de12f6884bafaa9b20600eb490/crates/hiroz/src/context.rs#L673",
+    "target_files": [
+      "crates/aos-core/src/context.rs",
+      "crates/aos-core/src/transport.rs",
+      "crates/aos-core/src/error.rs",
+      "crates/aos-core/tests/lifecycle.rs",
+      "crates/aos-core/README.md"
+    ],
+    "spec_adoption": "Rust源码移植候选",
+    "implementation_status": "ownership_reference_with_original_p0_implementation",
+    "copied_runtime_code": false,
+    "license": "Apache-2.0 OR MIT",
+    "spec_preserve": "Context管理session、create_node与销毁",
+    "spec_adapt": "类型依赖改AOS；保留每进程Context结构",
+    "actual_adoption": "Original AOS process-local shared session ownership and explicit shutdown. Node, names, typed entities and Rust-owned NodeCard/type-description services are implemented using this ownership tree. No Context source or test body copied."
+  },
+  {
+    "id": "REF-HIROZ-KEY-01",
+    "repository": "hiroz",
+    "commit": "d9f979a0404311de12f6884bafaa9b20600eb490",
+    "branch_or_version": "main snapshot",
+    "path": "crates/hiroz-protocol/src/format/rmw_zenoh.rs",
+    "line": 51,
+    "url": "https://github.com/ZettaScaleLabs/hiroz/blob/d9f979a0404311de12f6884bafaa9b20600eb490/crates/hiroz-protocol/src/format/rmw_zenoh.rs#L51",
+    "target_files": [
+      "crates/aos-zenoh/src/key.rs",
+      "crates/aos-zenoh/src/graph.rs"
+    ],
+    "spec_adoption": "Supplemental formatter reference for Spec sections 4 and 8",
+    "implementation_status": "adapted_formatter_and_liveliness_layout",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0 (selected)",
+    "spec_preserve": "Domain/topic/type/hash layout, internal topic slashes and untyped placeholders",
+    "spec_adapt": "AOS prefix and JSON interface identity; middleware keys stay inside aos-zenoh",
+    "actual_adoption": "Adapted fixed formatter lines 47-150: domain/topic/type/hash data keys and liveliness token layout. AOS adds its namespace prefix and JSON entity payload. Typed identities are validated by shared Rust Interface; no ROS CDR interoperability is claimed."
+  },
+  {
+    "id": "SRC-14",
+    "repository": "hiroz",
+    "commit": "d9f979a0404311de12f6884bafaa9b20600eb490",
+    "branch_or_version": "main snapshot",
+    "path": "crates/hiroz/src/pubsub.rs",
+    "line": 68,
+    "url": "https://github.com/ZettaScaleLabs/hiroz/blob/d9f979a0404311de12f6884bafaa9b20600eb490/crates/hiroz/src/pubsub.rs#L68",
+    "target_files": [
+      "crates/aos-zenoh/src/pubsub.rs"
+    ],
+    "spec_adoption": "Rust源码移植候选",
+    "implementation_status": "adapted_qos_configuration",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0 (selected)",
+    "spec_preserve": "Advanced pub/sub缓存、history、QoS映射",
+    "spec_adapt": "JSON编码；显式设置status profile；1.10.1编译验证",
+    "actual_adoption": "Translated fixed pubsub.rs lines 73-117 and 338-359: reliable Block versus best_effort Drop, transient_local Advanced cache/history/recovery, 500 ms heartbeat and history query settings. AOS uses JSON bytes, a bounded core queue, and explicit close handling. Integration checks exercise late join while publisher remains alive."
+  },
+  {
+    "id": "SRC-18",
+    "repository": "hiroz",
+    "commit": "d9f979a0404311de12f6884bafaa9b20600eb490",
+    "branch_or_version": "main snapshot",
+    "path": "crates/hiroz-py/Cargo.toml",
+    "line": 7,
+    "url": "https://github.com/ZettaScaleLabs/hiroz/blob/d9f979a0404311de12f6884bafaa9b20600eb490/crates/hiroz-py/Cargo.toml#L7",
+    "target_files": [
+      "Cargo.toml",
+      "pyproject.toml",
+      "crates/aos-py/Cargo.toml"
+    ],
+    "spec_adoption": "绑定实现参考",
+    "implementation_status": "native_context_bindings",
+    "copied_runtime_code": false,
+    "license": "Apache-2.0 OR MIT",
+    "spec_preserve": "PyO3 cdylib、原生handle、GIL释放",
+    "spec_adapt": "移除ROS/CDR类型依赖；暴露Jazzy accepted/execute分离语义",
+    "actual_adoption": "PyO3 0.30.1 native handles wrap Context, Node, Interface, typed Topic and Service. Blocking operations detach from Python. Python callbacks are scheduled by the SDK executor; the native layer never owns a Python business state machine. No Hiroz binding source copied."
+  },
+  {
+    "id": "SRC-20",
+    "repository": "zenoh",
+    "commit": "1211779c3647f5a96713dade452c546a07823580",
+    "branch_or_version": "1.10.1",
+    "path": "zenoh-ext/src/lib.rs",
+    "line": 67,
+    "url": "https://github.com/eclipse-zenoh/zenoh/blob/1211779c3647f5a96713dade452c546a07823580/zenoh-ext/src/lib.rs#L67",
+    "target_files": [
+      "Cargo.toml",
+      "Cargo.lock",
+      "crates/aos-zenoh/Cargo.toml",
+      "crates/aos-zenoh/src/session.rs",
+      "crates/aos-zenoh/src/pubsub.rs"
+    ],
+    "spec_adoption": "直接依赖",
+    "implementation_status": "direct_dependency",
+    "copied_runtime_code": false,
+    "license": "EPL-2.0 OR Apache-2.0",
+    "spec_preserve": "AdvancedPublisher/Subscriber及缓存历史",
+    "spec_adapt": "zenoh与zenoh-ext固定1.10.1，启用所需unstable",
+    "actual_adoption": "Exact 1.10.1 crates with TCP and unstable Advanced pub/sub. Direct dependency used for typed and raw Topic, transient_local history, liveliness graph and query/reply Service; see SRC-14 and REF-HIROZ-SERVICE-01 for adapted configuration."
+  },
+  {
+    "id": "SRC-21",
+    "repository": "rmw_zenoh",
+    "commit": "dda52d6d9bc863b4b6c86a0b4fd1c6788f4a651e",
+    "branch_or_version": "rolling reference only",
+    "path": "rmw_zenoh_cpp/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5",
+    "line": 1,
+    "url": "https://github.com/ros2/rmw_zenoh/blob/dda52d6d9bc863b4b6c86a0b4fd1c6788f4a651e/rmw_zenoh_cpp/config/DEFAULT_RMW_ZENOH_SESSION_CONFIG.json5#L1",
+    "target_files": [
+      "config/zenoh-session.json5",
+      "config/zenoh-router.json5"
+    ],
+    "spec_adoption": "配置移植参考",
+    "implementation_status": "configuration_reference_only",
+    "copied_runtime_code": false,
+    "license": "Apache-2.0",
+    "spec_preserve": "本机router、loopback peer、gossip发现",
+    "spec_adapt": "绑定AOS配置路径；在三平台实际验证",
+    "actual_adoption": "AOS-authored local router/peer configurations follow rmw_zenoh loopback/gossip topology. Peer autoconnect uses greater-zid to avoid symmetric connection attempts; session timestamps support AdvancedPublisher cached history. Native platform evidence is recorded separately."
+  },
+  {
+    "id": "REF-HIROZ-SERVICE-01",
+    "repository": "hiroz",
+    "commit": "d9f979a0404311de12f6884bafaa9b20600eb490",
+    "path": "crates/hiroz/src/service.rs",
+    "line": 97,
+    "url": "https://github.com/ZettaScaleLabs/hiroz/blob/d9f979a0404311de12f6884bafaa9b20600eb490/crates/hiroz/src/service.rs#L97",
+    "target_files": [
+      "crates/aos-zenoh/src/service.rs"
+    ],
+    "implementation_status": "adapted_query_reply_configuration",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0 (selected)",
+    "actual_adoption": "Adapted lines 97-114, 159-190 and 405-429: complete Queryable, QueryTarget::All, no consolidation, owned request queue and first reply. AOS supplies JSON transport errors, bounded waits, explicit close, and cancellation of the local wait; no automatic remote request retry."
+  },
+  {
+    "id": "SRC-01",
+    "repository": "rcl",
+    "commit": "18d96c9c2b98e616324ae9a2c7701dd0b0886ff0",
+    "path": "rcl_action/src/rcl_action/goal_state_machine.c",
+    "line": 81,
+    "url": "https://github.com/ros2/rcl/blob/18d96c9c2b98e616324ae9a2c7701dd0b0886ff0/rcl_action/src/rcl_action/goal_state_machine.c#L81",
+    "target_files": [
+      "crates/aos-core/src/action/state.rs"
+    ],
+    "implementation_status": "translated_fixed_upstream_behavior",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0",
+    "actual_adoption": "Rust translation of the eight legal Jazzy transitions. UNKNOWN is not installed for invalid operations; invalid transitions return an error, retaining original state."
+  },
+  {
+    "id": "SRC-03",
+    "repository": "rcl",
+    "commit": "18d96c9c2b98e616324ae9a2c7701dd0b0886ff0",
+    "path": "rcl_action/src/rcl_action/action_server.c",
+    "line": 650,
+    "url": "https://github.com/ros2/rcl/blob/18d96c9c2b98e616324ae9a2c7701dd0b0886ff0/rcl_action/src/rcl_action/action_server.c#L650",
+    "target_files": [
+      "crates/aos-core/src/action/server.rs"
+    ],
+    "implementation_status": "translated_fixed_upstream_behavior",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0",
+    "actual_adoption": "Translated terminal result retention and expiry. Rust provider owns goal state and pending result waiters; query correlation remains in transport. Core result_timeout default 10s follows rcl; Python facade passes rclpy 900s."
+  },
+  {
+    "id": "SRC-04",
+    "repository": "rclpy",
+    "commit": "4e607c09d624debc39a4ae5405680c06d87fac35",
+    "path": "rclpy/rclpy/action/server.py",
+    "line": 314,
+    "url": "https://github.com/ros2/rclpy/blob/4e607c09d624debc39a4ae5405680c06d87fac35/rclpy/rclpy/action/server.py#L314",
+    "target_files": [
+      "crates/aos-core/src/action/server.rs",
+      "python/aos_sdk/action.py"
+    ],
+    "implementation_status": "translated_fixed_upstream_behavior",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0",
+    "actual_adoption": "Translated goal/accepted/cancel/execute callback order and default behavior: accept, schedule execute, reject cancel by default; unfinished execution aborts; a callback exception after terminal preserves terminal status with default result. Provider Rust owns state; Python executor owns business callbacks."
+  },
+  {
+    "id": "REF-RMW-GET-RESULT",
+    "repository": "rmw_zenoh",
+    "commit": "dda52d6d9bc863b4b6c86a0b4fd1c6788f4a651e",
+    "path": "rmw_zenoh_cpp/src/detail/rmw_client_data.cpp",
+    "line": 135,
+    "url": "https://github.com/ros2/rmw_zenoh/blob/dda52d6d9bc863b4b6c86a0b4fd1c6788f4a651e/rmw_zenoh_cpp/src/detail/rmw_client_data.cpp#L135",
+    "target_files": [
+      "crates/aos-zenoh/src/service.rs",
+      "crates/aos-zenoh/src/session.rs"
+    ],
+    "implementation_status": "translated_fixed_upstream_behavior",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0",
+    "actual_adoption": "Ported the existing get_result-only timeout policy: no application deadline maps to u64::MAX milliseconds on the Zenoh query, one query, AllComplete target, no consolidation. This is a finite protocol bound, not mathematical infinity. Explicit finite wait and local close remain supported; ordinary Service None is unsupported."
+  },
+  {
+    "id": "SRC-02",
+    "repository": "rcl",
+    "commit": "18d96c9c2b98e616324ae9a2c7701dd0b0886ff0",
+    "path": "rcl_action/src/rcl_action/action_server.c",
+    "line": 816,
+    "url": "https://github.com/ros2/rcl/blob/18d96c9c2b98e616324ae9a2c7701dd0b0886ff0/rcl_action/src/rcl_action/action_server.c#L816",
+    "target_files": [
+      "crates/aos-core/src/action/server.rs"
+    ],
+    "implementation_status": "translated_fixed_upstream_behavior",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0",
+    "actual_adoption": "Translated the two original UUID/stamp cancellation-selection branches and existing return codes; no owner/recovery token or additional goal state."
+  },
+  {
+    "id": "SRC-05",
+    "repository": "rclpy",
+    "commit": "4e607c09d624debc39a4ae5405680c06d87fac35",
+    "path": "rclpy/rclpy/action/client.py",
+    "line": 35,
+    "url": "https://github.com/ros2/rclpy/blob/4e607c09d624debc39a4ae5405680c06d87fac35/rclpy/rclpy/action/client.py#L35",
+    "target_files": [
+      "crates/aos-core/src/action/client.rs",
+      "crates/aos-py/src/action.rs",
+      "python/aos_sdk/action.py"
+    ],
+    "implementation_status": "api_and_behavior_reference",
+    "copied_runtime_code": false,
+    "license": "Apache-2.0",
+    "actual_adoption": "Original native-handle facade follows ClientGoalHandle names, accepted/stamp/UUID observations, per-goal feedback filtering and get_result/cancel futures. Callback dispatch is Python executor work; authoritative status remains at provider Rust."
+  },
+  {
+    "id": "REF-ROS2CLI-DISCOVERY-01",
+    "repository": "ros2cli",
+    "commit": "a71e5b3c982384aa8081202f8b21a189f0eb7ce7",
+    "path": "ros2cli/ros2cli/node/direct.py",
+    "line": 23,
+    "url": "https://github.com/ros2/ros2cli/blob/a71e5b3c982384aa8081202f8b21a189f0eb7ce7/ros2cli/ros2cli/node/direct.py#L23",
+    "target_files": [
+      "crates/aos-cli/src/main.rs",
+      "crates/aos-cli/src/schema.rs"
+    ],
+    "implementation_status": "adapted_discovery_wait_policy",
+    "copied_runtime_code": false,
+    "license": "Apache-2.0",
+    "actual_adoption": "Adapted the fixed DirectNode default of 0.5 seconds (line 23) and active full-window discovery before graph inspection (lines 60-66). All AOS list commands and doctor report start one bounded liveliness snapshot immediately, count it toward the 0.5-second window, wait the remaining time even when entities are already visible, then return only a fresh final snapshot. Zenoh 1.10.1 src/api/session.rs:2881-2955 sends a stateless Current interest per snapshot and lines 3321-3330 finish it on DeclareFinal; its query timeout does not mean a minimum discovery interval. Earlier snapshots are discarded rather than merged, preserving observed removals. Help describes finite discovery, not global readiness or a confirmed Zenoh defect. No daemon, central cache or business-request retry is added."
+  },
+  {
+    "id": "REF-RCLPY-READINESS-01",
+    "repository": "rclpy",
+    "commit": "4e607c09d624debc39a4ae5405680c06d87fac35",
+    "path": "rclpy/rclpy/client.py",
+    "line": 163,
+    "url": "https://github.com/ros2/rclpy/blob/4e607c09d624debc39a4ae5405680c06d87fac35/rclpy/rclpy/client.py#L163",
+    "related_sources": [
+      "https://github.com/ros2/rclpy/blob/4e607c09d624debc39a4ae5405680c06d87fac35/rclpy/rclpy/action/client.py#L575",
+      "https://github.com/ros2/rmw_zenoh/blob/dda52d6d9bc863b4b6c86a0b4fd1c6788f4a651e/rmw_zenoh_cpp/src/rmw_zenoh.cpp#L2623",
+      "https://github.com/ros2/rmw_zenoh/blob/dda52d6d9bc863b4b6c86a0b4fd1c6788f4a651e/rmw_zenoh_cpp/src/detail/graph_cache.cpp#L1317",
+      "https://github.com/ros2/rcl/blob/18d96c9c2b98e616324ae9a2c7701dd0b0886ff0/rcl/src/rcl/graph.c#L755",
+      "https://github.com/ros2/rcl/blob/18d96c9c2b98e616324ae9a2c7701dd0b0886ff0/rcl/src/rcl/node.c#L397"
+    ],
+    "target_files": [
+      "crates/aos-core/src/node.rs",
+      "crates/aos-core/src/action/client.rs",
+      "crates/aos-py/src/typed.rs",
+      "crates/aos-py/src/action.rs",
+      "python/aos_sdk/node.py",
+      "python/aos_sdk/action.py",
+      "python/aos_sdk/_native.pyi",
+      "examples/add_two_ints_client.py",
+      "examples/fibonacci_client.py",
+      "python/tests/test_typed_sdk.py"
+    ],
+    "implementation_status": "adapted_readiness_wait_policy",
+    "copied_runtime_code": false,
+    "license": "Apache-2.0",
+    "actual_adoption": "Follows rclpy wait_for_service/wait_for_server bool, timeout and None behavior, using native availability before a separately invoked single business request. rmw_zenoh availability reads graph service identity; AOS polls existing liveliness snapshots every at most 50 ms, requiring Service/ActionServer kind plus exact name/type/hash, without a new cache or transport interface. ActionServer declares its identity after its five protocol entities; discovery is an observation, not a guarantee that a subsequent request succeeds. Zero/negative timeouts perform one immediate snapshot; finite timeout returns false; native entity/context closure remains Closed/InvalidStateError, consistent with rclpy's final availability check reaching rcl node/context validation. PyO3 releases the GIL and Python holds no duplicate readiness state. No business retry is added."
+  },
+  {
+    "id": "REF-ACTION-CLI-CODES-01",
+    "repository": "rcl_interfaces",
+    "commit": "7aa3caf43377ea6ad615bc1040832e2c7566bfbe",
+    "path": "action_msgs/msg/GoalStatus.msg",
+    "line": 7,
+    "url": "https://github.com/ros2/rcl_interfaces/blob/7aa3caf43377ea6ad615bc1040832e2c7566bfbe/action_msgs/msg/GoalStatus.msg#L7",
+    "related_sources": [
+      "https://github.com/ros2/rcl_interfaces/blob/7aa3caf43377ea6ad615bc1040832e2c7566bfbe/action_msgs/srv/CancelGoal.srv#L23"
+    ],
+    "target_files": [
+      "crates/aos-cli/src/schema.rs"
+    ],
+    "implementation_status": "machine_readable_contract_reference",
+    "copied_runtime_code": false,
+    "license": "Apache-2.0",
+    "actual_adoption": "Root/Action help and every Action command schema publish numeric GoalStatus 0-6 and CancelGoal return_code 0-3 mappings using existing core constants. Terminal values are explicit. Documentation preserves the provider-owned state and distinguishes accepted cancellation from terminal CANCELED; ERROR_NONE alone is not proof that any goal accepted cancellation. Runtime wire values and state transitions are unchanged."
+  },
+  {
+    "id": "REF-ZENOH-LIVELINESS-HISTORY-01",
+    "repository": "zenoh",
+    "commit": "1211779c3647f5a96713dade452c546a07823580",
+    "branch_or_version": "1.10.1 with local history ordering patch",
+    "path": "zenoh/src/api/session.rs",
+    "line": 2015,
+    "url": "https://github.com/eclipse-zenoh/zenoh/blob/1211779c3647f5a96713dade452c546a07823580/zenoh/src/api/session.rs#L2015",
+    "target_files": [
+      "vendor/zenoh/src/api/mod.rs",
+      "vendor/zenoh/src/api/session.rs",
+      "vendor/zenoh/src/api/subscriber.rs",
+      "vendor/zenoh/src/api/liveliness_history.rs",
+      "Cargo.toml",
+      "Cargo.lock",
+      "crates/aos-zenoh/tests/liveliness_history.rs",
+      "crates/aos-zenoh/tests/readiness.rs"
+    ],
+    "implementation_status": "vendored_exact_release_with_local_ordering_fix",
+    "copied_runtime_code": true,
+    "license": "Apache-2.0 (selected)",
+    "archive_sha256": "453ba5d28a1197653aae4bb024fd74a9d5c7051d5a19a77f3a43d83f40c22584",
+    "source_patch": "upstream/patches/zenoh-1.10.1-liveliness-history.patch",
+    "manifest": "upstream/zenoh-1.10.1-vendor-manifest.json",
+    "actual_adoption": "Vendors the exact published zenoh 1.10.1 crate and gates nonempty cached liveliness history ahead of subsequent live callbacks. Original drop notifier remains inside the gate; callbacks run outside session/gate locks. Explicit close releases pending events; replay panic recovers future live delivery. No tombstone or version upgrade. Deterministic helper and real TCP tests cover ordering, reentry, panic/drop, close, and same-session same-token reconnect. Cross-session instantaneous readiness is not a synchronization guarantee."
+  }
+]

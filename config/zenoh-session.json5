@@ -1,0 +1,26 @@
+{
+  mode: "peer",
+  connect: {
+    endpoints: ["tcp/localhost:7447"],
+    // Match rmw_zenoh: start locally and reconnect when the Router arrives.
+    timeout_ms: { router: -1, peer: -1, client: 0 },
+    exit_on_failure: { router: false, peer: false, client: true },
+  },
+  listen: {
+    endpoints: ["tcp/localhost:0"],
+    timeout_ms: 0,
+    exit_on_failure: true,
+  },
+  scouting: {
+    multicast: { enabled: false },
+    gossip: {
+      enabled: true,
+      multihop: false,
+      target: { router: ["router", "peer"], peer: ["router"] },
+      autoconnect: { router: [], peer: ["router", "peer"] },
+      autoconnect_strategy: { peer: { to_router: "always", to_peer: "greater-zid" } },
+    },
+  },
+  // Cache-only transient-local publishers require session timestamps.
+  timestamping: { enabled: { router: true, peer: true, client: true } },
+}

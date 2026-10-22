@@ -1,0 +1,32 @@
+[package]
+name = "aos-zenoh"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aos-core.workspace = true
+zenoh.workspace = true
+zenoh-ext.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+sha2.workspace = true
+zenoh-link-tls.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[[test]]
+name = "zenoh_config"
+path = "../../tests/e2e/zenoh_config.rs"
+
+[[test]]
+name = "telemetry_process"
+path = "tests/telemetry_process.rs"
+harness = false

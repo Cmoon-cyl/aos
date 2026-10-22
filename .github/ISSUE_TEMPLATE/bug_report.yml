@@ -1,0 +1,31 @@
+name: Bug report
+description: 报告能够复现的问题
+title: "[Bug] "
+body:
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: AOS 版本、操作系统和架构、Python 版本、安装方式及 Router 拓扑。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 最小复现
+      description: 提供复现步骤、最小程序和必要配置。不要包含凭据或业务数据。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      description: 包括错误码和经过脱敏的必要日志。
+    validations:
+      required: true

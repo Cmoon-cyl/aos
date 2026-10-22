@@ -1,0 +1,17 @@
+{
+  "name": "aos_demo/msg/Status",
+  "kind": "msg",
+  "message": {
+    "type": "object",
+    "properties": {
+      "received": {"type": "integer", "minimum": 0},
+      "last_label": {"type": "string"},
+      "sequence": {"type": "integer", "minimum": 1},
+      "threshold": {"type": "integer", "minimum": 1},
+      "state": {"type": "string", "enum": ["waiting", "ready"]},
+      "pid": {"type": "integer", "minimum": 1}
+    },
+    "required": ["received", "last_label", "sequence", "threshold", "state", "pid"],
+    "additionalProperties": false
+  }
+}

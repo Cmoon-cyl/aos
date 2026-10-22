@@ -1,0 +1,21 @@
+{
+  "name": "aos_examples/srv/AddTwoInts",
+  "kind": "srv",
+  "request": {
+    "type": "object",
+    "properties": {
+      "a": {"type": "integer"},
+      "b": {"type": "integer"}
+    },
+    "required": ["a", "b"],
+    "additionalProperties": false,
+    "examples": [{"a": 2, "b": 3}]
+  },
+  "response": {
+    "type": "object",
+    "properties": {"sum": {"type": "integer"}},
+    "required": ["sum"],
+    "additionalProperties": false,
+    "examples": [{"sum": 5}]
+  }
+}

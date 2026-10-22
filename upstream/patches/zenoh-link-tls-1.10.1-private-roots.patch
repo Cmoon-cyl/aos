@@ -1,0 +1,1453 @@
+diff --git a/vendor/zenoh-link-tls/AOS-PATCH.md b/vendor/zenoh-link-tls/AOS-PATCH.md
+new file mode 100644
+--- /dev/null
++++ b/vendor/zenoh-link-tls/AOS-PATCH.md
+@@ -0,0 +1,32 @@
++# AOS private CA roots, synchronized TLS I/O and certificate expiration
++
++Upstream: zenoh-link-tls 1.10.1, Zenoh commit 1211779c3647f5a96713dade452c546a07823580.
++Original crate SHA256: cce65fd71b4631821a85058542e28faac0151af6c53cd61f2dfafc7e16c4d6c4.
++
++An explicit client CA replaces the built-in Web PKI roots. With no explicit CA, the upstream root set is unchanged. Server-side client authentication is unchanged. The public AOS_PRIVATE_ROOTS_PATCH_VERSION constant makes an absent workspace patch fail to build in aos-zenoh. LICENSE and NOTICE.md are copied from the fixed upstream commit; AOS selects Apache-2.0.
++
++The change is restricted to `src/utils.rs` (explicit root-store construction and its tests), `src/unicast.rs` (TLS I/O synchronization and its tests), and `src/lib.rs` (build guards). The complete original crate is preserved; the manifest and replayable patch include the license, notice and this modification notice. `scripts/check_zenoh_tls_vendor.py` verifies the pinned archive, exact edit set, and full patch replay. The historical patch filename includes both fixes.
++
++Two unit tests check the root-selection helper. Three further tests call the real `TlsClientConfig::new` constructor with one explicit PEM CA, an explicitly empty CA, and no CA. A `#[cfg(test)]` field observes the length of the same `RootCertStore` consumed by the rustls builder; it adds no field to production builds. The tests require counts of one, zero, and the upstream public-root count respectively. The embedded fixture is a public self-signed test certificate; its private key is not retained and no network connection is required. Restoring the pinned upstream constructor's public-roots-plus-extend block makes the explicit-CA constructor assertions fail while the helper tests still pass.
++
++`tests/security_runtime.rs` exercises the resulting transport. An empty-CA client failing against a private-CA router is only a fail-closed observation: the same rejection can occur when public roots are present. That handshake result alone does not prove that public-root fallback is absent. The constructor tests establish the root-store wiring; the source verifier establishes provenance and complete patch replay. Neither substitutes for the transport's runtime acceptance.
++
++## TLS I/O synchronization
++
++Upstream 1.10.1 stores a complete `TlsStream` in `UnsafeCell`, with independent read and write mutexes, and creates a mutable reference to the same stream in both directions. The mutexes do not exclude a read from a write. Both operations mutate rustls connection state; the unsafe Send/Sync implementations therefore do not make this access sound. The same upstream defect is reported in [Zenoh issue #2557](https://github.com/eclipse-zenoh/zenoh/issues/2557).
++
++AOS replaces the cell and manual Send/Sync implementations with `tokio::io::split`. Its halves share one mutex around each synchronous poll, released before Pending is returned. Per-direction async mutexes retain ordering across complete read/write operations. A pending read cannot hold the shared TLS lock while waiting for peer input.
++
++Both `write` and `write_all` flush the TLS writer before releasing that operation's mutex. tokio-rustls can accept plaintext while retaining encrypted output; without this flush an idle link can leave its final record buffered until a later write or close. The traffic regression requires both receivers to finish before either link is closed, so shutdown cannot hide buffered application data.
++
++Explicit close and certificate expiration flush and shut down the TLS write half, including close_notify, instead of directly shutting down the underlying TCP stream through an aliased mutable reference. Dropping both owned halves closes the TCP socket without entering another runtime. `AOS_TLS_IO_PATCH_VERSION` makes an absent I/O patch fail to build in aos-zenoh independently of the private-CA guard.
++
++Three real TLS regressions cover simultaneous two-way traffic (256 frames of 64 KiB in each direction, every sequence and payload byte checked), writing and graceful closing while a read is pending, and releasing the socket outside a runtime enter guard. They generate temporary loopback certificates with OpenSSL and retain no credentials. The same traffic test against the original UnsafeCell implementation reproduced `handshake not complete` at its write_all path. These tests complement, rather than replace, installed multi-host acceptance.
++
++## Certificate expiration during link construction
++
++Upstream starts `LinkCertExpirationManager` inside `Arc::new_cyclic`. An already-due expiration task can run before that constructor returns; its `Weak` cannot yet upgrade, so the task exits without closing the link. Native diagnostics observed old links closing at server-certificate expiry followed by a new TCP connection whose expiration task started but never closed it. Certificate handshake time has second precision, making a connection in the expiration second a concrete trigger.
++
++AOS registers a fully constructed intermediate expiration target. That target waits for a retained `Notify` permit before upgrading the weak link. The constructor publishes the link Arc and then releases the permit. Dropping the registration also releases it, so initialization unwinding cannot leave the task waiting forever. The target owns only a weak link, preserving the absence of an ownership cycle. Newly admitted monitored links also reject certificate deadlines that have already arrived; the initialization gate still handles expiry during construction.
++
++Two deterministic regressions force the expiration callback to execute while the link is still inside `Arc::new_cyclic`, and force initialization to unwind while that callback is waiting. They require actual expiration after successful initialization and release of the waiting task after failed initialization. Native acceptance explicitly runs the TLS crate's full unit suite in addition to the workspace and live certificate-boundary tests.
+diff --git a/vendor/zenoh-link-tls/LICENSE b/vendor/zenoh-link-tls/LICENSE
+new file mode 100644
+--- /dev/null
++++ b/vendor/zenoh-link-tls/LICENSE
+@@ -0,0 +1,459 @@
++apache-2.0
++epl-2.0
++
++
++                                 Apache License
++                           Version 2.0, January 2004
++                        http://www.apache.org/licenses/
++
++   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
++
++   1. Definitions.
++
++      "License" shall mean the terms and conditions for use, reproduction,
++      and distribution as defined by Sections 1 through 9 of this document.
++
++      "Licensor" shall mean the copyright owner or entity authorized by
++      the copyright owner that is granting the License.
++
++      "Legal Entity" shall mean the union of the acting entity and all
++      other entities that control, are controlled by, or are under common
++      control with that entity. For the purposes of this definition,
++      "control" means (i) the power, direct or indirect, to cause the
++      direction or management of such entity, whether by contract or
++      otherwise, or (ii) ownership of fifty percent (50%) or more of the
++      outstanding shares, or (iii) beneficial ownership of such entity.
++
++      "You" (or "Your") shall mean an individual or Legal Entity
++      exercising permissions granted by this License.
++
++      "Source" form shall mean the preferred form for making modifications,
++      including but not limited to software source code, documentation
++      source, and configuration files.
++
++      "Object" form shall mean any form resulting from mechanical
++      transformation or translation of a Source form, including but
++      not limited to compiled object code, generated documentation,
++      and conversions to other media types.
++
++      "Work" shall mean the work of authorship, whether in Source or
++      Object form, made available under the License, as indicated by a
++      copyright notice that is included in or attached to the work
++      (an example is provided in the Appendix below).
++
++      "Derivative Works" shall mean any work, whether in Source or Object
++      form, that is based on (or derived from) the Work and for which the
++      editorial revisions, annotations, elaborations, or other modifications
++      represent, as a whole, an original work of authorship. For the purposes
++      of this License, Derivative Works shall not include works that remain
++      separable from, or merely link (or bind by name) to the interfaces of,
++      the Work and Derivative Works thereof.
++
++      "Contribution" shall mean any work of authorship, including
++      the original version of the Work and any modifications or additions
++      to that Work or Derivative Works thereof, that is intentionally
++      submitted to Licensor for inclusion in the Work by the copyright owner
++      or by an individual or Legal Entity authorized to submit on behalf of
++      the copyright owner. For the purposes of this definition, "submitted"
++      means any form of electronic, verbal, or written communication sent
++      to the Licensor or its representatives, including but not limited to
++      communication on electronic mailing lists, source code control systems,
++      and issue tracking systems that are managed by, or on behalf of, the
++      Licensor for the purpose of discussing and improving the Work, but
++      excluding communication that is conspicuously marked or otherwise
++      designated in writing by the copyright owner as "Not a Contribution."
++
++      "Contributor" shall mean Licensor and any individual or Legal Entity
++      on behalf of whom a Contribution has been received by Licensor and
++      subsequently incorporated within the Work.
++
++   2. Grant of Copyright License. Subject to the terms and conditions of
++      this License, each Contributor hereby grants to You a perpetual,
++      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
++      copyright license to reproduce, prepare Derivative Works of,
++      publicly display, publicly perform, sublicense, and distribute the
++      Work and such Derivative Works in Source or Object form.
++
++   3. Grant of Patent License. Subject to the terms and conditions of
++      this License, each Contributor hereby grants to You a perpetual,
++      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
++      (except as stated in this section) patent license to make, have made,
++      use, offer to sell, sell, import, and otherwise transfer the Work,
++      where such license applies only to those patent claims licensable
++      by such Contributor that are necessarily infringed by their
++      Contribution(s) alone or by combination of their Contribution(s)
++      with the Work to which such Contribution(s) was submitted. If You
++      institute patent litigation against any entity (including a
++      cross-claim or counterclaim in a lawsuit) alleging that the Work
++      or a Contribution incorporated within the Work constitutes direct
++      or contributory patent infringement, then any patent licenses
++      granted to You under this License for that Work shall terminate
++      as of the date such litigation is filed.
++
++   4. Redistribution. You may reproduce and distribute copies of the
++      Work or Derivative Works thereof in any medium, with or without
++      modifications, and in Source or Object form, provided that You
++      meet the following conditions:
++
++      (a) You must give any other recipients of the Work or
++          Derivative Works a copy of this License; and
++
++      (b) You must cause any modified files to carry prominent notices
++          stating that You changed the files; and
++
++      (c) You must retain, in the Source form of any Derivative Works
++          that You distribute, all copyright, patent, trademark, and
++          attribution notices from the Source form of the Work,
++          excluding those notices that do not pertain to any part of
++          the Derivative Works; and
++
++      (d) If the Work includes a "NOTICE" text file as part of its
++          distribution, then any Derivative Works that You distribute must
++          include a readable copy of the attribution notices contained
++          within such NOTICE file, excluding those notices that do not
++          pertain to any part of the Derivative Works, in at least one
++          of the following places: within a NOTICE text file distributed
++          as part of the Derivative Works; within the Source form or
++          documentation, if provided along with the Derivative Works; or,
++          within a display generated by the Derivative Works, if and
++          wherever such third-party notices normally appear. The contents
++          of the NOTICE file are for informational purposes only and
++          do not modify the License. You may add Your own attribution
++          notices within Derivative Works that You distribute, alongside
++          or as an addendum to the NOTICE text from the Work, provided
++          that such additional attribution notices cannot be construed
++          as modifying the License.
++
++      You may add Your own copyright statement to Your modifications and
++      may provide additional or different license terms and conditions
++      for use, reproduction, or distribution of Your modifications, or
++      for any such Derivative Works as a whole, provided Your use,
++      reproduction, and distribution of the Work otherwise complies with
++      the conditions stated in this License.
++
++   5. Submission of Contributions. Unless You explicitly state otherwise,
++      any Contribution intentionally submitted for inclusion in the Work
++      by You to the Licensor shall be under the terms and conditions of
++      this License, without any additional terms or conditions.
++      Notwithstanding the above, nothing herein shall supersede or modify
++      the terms of any separate license agreement you may have executed
++      with Licensor regarding such Contributions.
++
++   6. Trademarks. This License does not grant permission to use the trade
++      names, trademarks, service marks, or product names of the Licensor,
++      except as required for reasonable and customary use in describing the
++      origin of the Work and reproducing the content of the NOTICE file.
++
++   7. Disclaimer of Warranty. Unless required by applicable law or
++      agreed to in writing, Licensor provides the Work (and each
++      Contributor provides its Contributions) on an "AS IS" BASIS,
++      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
++      implied, including, without limitation, any warranties or conditions
++      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
++      PARTICULAR PURPOSE. You are solely responsible for determining the
++      appropriateness of using or redistributing the Work and assume any
++      risks associated with Your exercise of permissions under this License.
++
++   8. Limitation of Liability. In no event and under no legal theory,
++      whether in tort (including negligence), contract, or otherwise,
++      unless required by applicable law (such as deliberate and grossly
++      negligent acts) or agreed to in writing, shall any Contributor be
++      liable to You for damages, including any direct, indirect, special,
++      incidental, or consequential damages of any character arising as a
++      result of this License or out of the use or inability to use the
++      Work (including but not limited to damages for loss of goodwill,
++      work stoppage, computer failure or malfunction, or any and all
++      other commercial damages or losses), even if such Contributor
++      has been advised of the possibility of such damages.
++
++   9. Accepting Warranty or Additional Liability. While redistributing
++      the Work or Derivative Works thereof, You may choose to offer,
++      and charge a fee for, acceptance of support, warranty, indemnity,
++      or other liability obligations and/or rights consistent with this
++      License. However, in accepting such obligations, You may act only
++      on Your own behalf and on Your sole responsibility, not on behalf
++      of any other Contributor, and only if You agree to indemnify,
++      defend, and hold each Contributor harmless for any liability
++      incurred by, or claims asserted against, such Contributor by reason
++      of your accepting any such warranty or additional liability.
++
++    OR
++
++Eclipse Public License - v 2.0
++
++    THE ACCOMPANYING PROGRAM IS PROVIDED UNDER THE TERMS OF THIS ECLIPSE
++    PUBLIC LICENSE ("AGREEMENT"). ANY USE, REPRODUCTION OR DISTRIBUTION
++    OF THE PROGRAM CONSTITUTES RECIPIENT'S ACCEPTANCE OF THIS AGREEMENT.
++
++1. DEFINITIONS
++
++"Contribution" means:
++
++  a) in the case of the initial Contributor, the initial content
++     Distributed under this Agreement, and
++
++  b) in the case of each subsequent Contributor:
++     i) changes to the Program, and
++     ii) additions to the Program;
++  where such changes and/or additions to the Program originate from
++  and are Distributed by that particular Contributor. A Contribution
++  "originates" from a Contributor if it was added to the Program by
++  such Contributor itself or anyone acting on such Contributor's behalf.
++  Contributions do not include changes or additions to the Program that
++  are not Modified Works.
++
++"Contributor" means any person or entity that Distributes the Program.
++
++"Licensed Patents" mean patent claims licensable by a Contributor which
++are necessarily infringed by the use or sale of its Contribution alone
++or when combined with the Program.
++
++"Program" means the Contributions Distributed in accordance with this
++Agreement.
++
++"Recipient" means anyone who receives the Program under this Agreement
++or any Secondary License (as applicable), including Contributors.
++
++"Derivative Works" shall mean any work, whether in Source Code or other
++form, that is based on (or derived from) the Program and for which the
++editorial revisions, annotations, elaborations, or other modifications
++represent, as a whole, an original work of authorship.
++
++"Modified Works" shall mean any work in Source Code or other form that
++results from an addition to, deletion from, or modification of the
++contents of the Program, including, for purposes of clarity any new file
++in Source Code form that contains any contents of the Program. Modified
++Works shall not include works that contain only declarations,
++interfaces, types, classes, structures, or files of the Program solely
++in each case in order to link to, bind by name, or subclass the Program
++or Modified Works thereof.
++
++"Distribute" means the acts of a) distributing or b) making available
++in any manner that enables the transfer of a copy.
++
++"Source Code" means the form of a Program preferred for making
++modifications, including but not limited to software source code,
++documentation source, and configuration files.
++
++"Secondary License" means either the GNU General Public License,
++Version 2.0, or any later versions of that license, including any
++exceptions or additional permissions as identified by the initial
++Contributor.
++
++2. GRANT OF RIGHTS
++
++  a) Subject to the terms of this Agreement, each Contributor hereby
++  grants Recipient a non-exclusive, worldwide, royalty-free copyright
++  license to reproduce, prepare Derivative Works of, publicly display,
++  publicly perform, Distribute and sublicense the Contribution of such
++  Contributor, if any, and such Derivative Works.
++
++  b) Subject to the terms of this Agreement, each Contributor hereby
++  grants Recipient a non-exclusive, worldwide, royalty-free patent
++  license under Licensed Patents to make, use, sell, offer to sell,
++  import and otherwise transfer the Contribution of such Contributor,
++  if any, in Source Code or other form. This patent license shall
++  apply to the combination of the Contribution and the Program if, at
++  the time the Contribution is added by the Contributor, such addition
++  of the Contribution causes such combination to be covered by the
++  Licensed Patents. The patent license shall not apply to any other
++  combinations which include the Contribution. No hardware per se is
++  licensed hereunder.
++
++  c) Recipient understands that although each Contributor grants the
++  licenses to its Contributions set forth herein, no assurances are
++  provided by any Contributor that the Program does not infringe the
++  patent or other intellectual property rights of any other entity.
++  Each Contributor disclaims any liability to Recipient for claims
++  brought by any other entity based on infringement of intellectual
++  property rights or otherwise. As a condition to exercising the
++  rights and licenses granted hereunder, each Recipient hereby
++  assumes sole responsibility to secure any other intellectual
++  property rights needed, if any. For example, if a third party
++  patent license is required to allow Recipient to Distribute the
++  Program, it is Recipient's responsibility to acquire that license
++  before distributing the Program.
++
++  d) Each Contributor represents that to its knowledge it has
++  sufficient copyright rights in its Contribution, if any, to grant
++  the copyright license set forth in this Agreement.
++
++  e) Notwithstanding the terms of any Secondary License, no
++  Contributor makes additional grants to any Recipient (other than
++  those set forth in this Agreement) as a result of such Recipient's
++  receipt of the Program under the terms of a Secondary License
++  (if permitted under the terms of Section 3).
++
++3. REQUIREMENTS
++
++3.1 If a Contributor Distributes the Program in any form, then:
++
++  a) the Program must also be made available as Source Code, in
++  accordance with section 3.2, and the Contributor must accompany
++  the Program with a statement that the Source Code for the Program
++  is available under this Agreement, and informs Recipients how to
++  obtain it in a reasonable manner on or through a medium customarily
++  used for software exchange; and
++
++  b) the Contributor may Distribute the Program under a license
++  different than this Agreement, provided that such license:
++     i) effectively disclaims on behalf of all other Contributors all
++     warranties and conditions, express and implied, including
++     warranties or conditions of title and non-infringement, and
++     implied warranties or conditions of merchantability and fitness
++     for a particular purpose;
++
++     ii) effectively excludes on behalf of all other Contributors all
++     liability for damages, including direct, indirect, special,
++     incidental and consequential damages, such as lost profits;
++
++     iii) does not attempt to limit or alter the recipients' rights
++     in the Source Code under section 3.2; and
++
++     iv) requires any subsequent distribution of the Program by any
++     party to be under a license that satisfies the requirements
++     of this section 3.
++
++3.2 When the Program is Distributed as Source Code:
++
++  a) it must be made available under this Agreement, or if the
++  Program (i) is combined with other material in a separate file or
++  files made available under a Secondary License, and (ii) the initial
++  Contributor attached to the Source Code the notice described in
++  Exhibit A of this Agreement, then the Program may be made available
++  under the terms of such Secondary Licenses, and
++
++  b) a copy of this Agreement must be included with each copy of
++  the Program.
++
++3.3 Contributors may not remove or alter any copyright, patent,
++trademark, attribution notices, disclaimers of warranty, or limitations
++of liability ("notices") contained within the Program from any copy of
++the Program which they Distribute, provided that Contributors may add
++their own appropriate notices.
++
++4. COMMERCIAL DISTRIBUTION
++
++Commercial distributors of software may accept certain responsibilities
++with respect to end users, business partners and the like. While this
++license is intended to facilitate the commercial use of the Program,
++the Contributor who includes the Program in a commercial product
++offering should do so in a manner which does not create potential
++liability for other Contributors. Therefore, if a Contributor includes
++the Program in a commercial product offering, such Contributor
++("Commercial Contributor") hereby agrees to defend and indemnify every
++other Contributor ("Indemnified Contributor") against any losses,
++damages and costs (collectively "Losses") arising from claims, lawsuits
++and other legal actions brought by a third party against the Indemnified
++Contributor to the extent caused by the acts or omissions of such
++Commercial Contributor in connection with its distribution of the Program
++in a commercial product offering. The obligations in this section do not
++apply to any claims or Losses relating to any actual or alleged
++intellectual property infringement. In order to qualify, an Indemnified
++Contributor must: a) promptly notify the Commercial Contributor in
++writing of such claim, and b) allow the Commercial Contributor to control,
++and cooperate with the Commercial Contributor in, the defense and any
++related settlement negotiations. The Indemnified Contributor may
++participate in any such claim at its own expense.
++
++For example, a Contributor might include the Program in a commercial
++product offering, Product X. That Contributor is then a Commercial
++Contributor. If that Commercial Contributor then makes performance
++claims, or offers warranties related to Product X, those performance
++claims and warranties are such Commercial Contributor's responsibility
++alone. Under this section, the Commercial Contributor would have to
++defend claims against the other Contributors related to those performance
++claims and warranties, and if a court requires any other Contributor to
++pay any damages as a result, the Commercial Contributor must pay
++those damages.
++
++5. NO WARRANTY
++
++EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT
++PERMITTED BY APPLICABLE LAW, THE PROGRAM IS PROVIDED ON AN "AS IS"
++BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EITHER EXPRESS OR
++IMPLIED INCLUDING, WITHOUT LIMITATION, ANY WARRANTIES OR CONDITIONS OF
++TITLE, NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR
++PURPOSE. Each Recipient is solely responsible for determining the
++appropriateness of using and distributing the Program and assumes all
++risks associated with its exercise of rights under this Agreement,
++including but not limited to the risks and costs of program errors,
++compliance with applicable laws, damage to or loss of data, programs
++or equipment, and unavailability or interruption of operations.
++
++6. DISCLAIMER OF LIABILITY
++
++EXCEPT AS EXPRESSLY SET FORTH IN THIS AGREEMENT, AND TO THE EXTENT
++PERMITTED BY APPLICABLE LAW, NEITHER RECIPIENT NOR ANY CONTRIBUTORS
++SHALL HAVE ANY LIABILITY FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
++EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING WITHOUT LIMITATION LOST
++PROFITS), HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ARISING IN ANY WAY OUT OF THE USE OR DISTRIBUTION OF THE PROGRAM OR THE
++EXERCISE OF ANY RIGHTS GRANTED HEREUNDER, EVEN IF ADVISED OF THE
++POSSIBILITY OF SUCH DAMAGES.
++
++7. GENERAL
++
++If any provision of this Agreement is invalid or unenforceable under
++applicable law, it shall not affect the validity or enforceability of
++the remainder of the terms of this Agreement, and without further
++action by the parties hereto, such provision shall be reformed to the
++minimum extent necessary to make such provision valid and enforceable.
++
++If Recipient institutes patent litigation against any entity
++(including a cross-claim or counterclaim in a lawsuit) alleging that the
++Program itself (excluding combinations of the Program with other software
++or hardware) infringes such Recipient's patent(s), then such Recipient's
++rights granted under Section 2(b) shall terminate as of the date such
++litigation is filed.
++
++All Recipient's rights under this Agreement shall terminate if it
++fails to comply with any of the material terms or conditions of this
++Agreement and does not cure such failure in a reasonable period of
++time after becoming aware of such noncompliance. If all Recipient's
++rights under this Agreement terminate, Recipient agrees to cease use
++and distribution of the Program as soon as reasonably practicable.
++However, Recipient's obligations under this Agreement and any licenses
++granted by Recipient relating to the Program shall continue and survive.
++
++Everyone is permitted to copy and distribute copies of this Agreement,
++but in order to avoid inconsistency the Agreement is copyrighted and
++may only be modified in the following manner. The Agreement Steward
++reserves the right to publish new versions (including revisions) of
++this Agreement from time to time. No one other than the Agreement
++Steward has the right to modify this Agreement. The Eclipse Foundation
++is the initial Agreement Steward. The Eclipse Foundation may assign the
++responsibility to serve as the Agreement Steward to a suitable separate
++entity. Each new version of the Agreement will be given a distinguishing
++version number. The Program (including Contributions) may always be
++Distributed subject to the version of the Agreement under which it was
++received. In addition, after a new version of the Agreement is published,
++Contributor may elect to Distribute the Program (including its
++Contributions) under the new version.
++
++Except as expressly stated in Sections 2(a) and 2(b) above, Recipient
++receives no rights or licenses to the intellectual property of any
++Contributor under this Agreement, whether expressly, by implication,
++estoppel or otherwise. All rights in the Program not expressly granted
++under this Agreement are reserved. Nothing in this Agreement is intended
++to be enforceable by any entity that is not a Contributor or Recipient.
++No third-party beneficiary rights are created under this Agreement.
++
++Exhibit A - Form of Secondary Licenses Notice
++
++"This Source Code may also be made available under the following 
++Secondary Licenses when the conditions for such availability set forth 
++in the Eclipse Public License, v. 2.0 are satisfied: {name license(s),
++version(s), and exceptions or additional permissions here}."
++
++  Simply including a copy of this Agreement, including this Exhibit A
++  is not sufficient to license the Source Code under Secondary Licenses.
++
++  If it is not possible or desirable to put the notice in a particular
++  file, then You may include the notice in a location (such as a LICENSE
++  file in a relevant directory) where a recipient would be likely to
++  look for such a notice.
++
++  You may add additional accurate notices of copyright ownership.
++
+diff --git a/vendor/zenoh-link-tls/NOTICE.md b/vendor/zenoh-link-tls/NOTICE.md
+new file mode 100644
+--- /dev/null
++++ b/vendor/zenoh-link-tls/NOTICE.md
+@@ -0,0 +1,40 @@
++# Notices for Eclipse zenoh
++
++This content is produced and maintained by the Eclipse zenoh project.
++
++ * Project home: https://projects.eclipse.org/projects/iot.zenoh
++
++## Trademarks
++
++Eclipse zenoh is trademark of the Eclipse Foundation. 
++Eclipse, and the Eclipse Logo are registered trademarks of the Eclipse Foundation.
++
++## Copyright
++
++All content is the property of the respective authors or their employers.
++For more information regarding authorship of content, please consult the
++listed source code repository logs.
++
++## Declared Project Licenses
++
++This program and the accompanying materials are made available under the
++terms of the Eclipse Public License 2.0 which is available at
++http://www.eclipse.org/legal/epl-2.0, or the Apache License, Version 2.0
++which is available at https://www.apache.org/licenses/LICENSE-2.0.
++
++SPDX-License-Identifier: EPL-2.0 OR Apache-2.0
++
++## Source Code
++
++The project maintains the following source code repositories:
++
++ * https://github.com/eclipse-zenoh/zenoh.git
++ * https://github.com/eclipse-zenoh/zenoh-c.git
++ * https://github.com/eclipse-zenoh/zenoh-java.git
++ * https://github.com/eclipse-zenoh/zenoh-go.git
++ * https://github.com/eclipse-zenoh/zenoh-python.git
++
++## Third-party Content
++
++ *To be completed...*
++
+diff --git a/vendor/zenoh-link-tls/src/lib.rs b/vendor/zenoh-link-tls/src/lib.rs
+--- a/vendor/zenoh-link-tls/src/lib.rs
++++ b/vendor/zenoh-link-tls/src/lib.rs
+@@ -32,6 +32,12 @@
+ mod utils;
+ pub use unicast::*;
+ pub use utils::TlsConfigurator;
++
++/// Build guard for AOS explicit-CA client trust-store semantics.
++pub const AOS_PRIVATE_ROOTS_PATCH_VERSION: u32 = 1;
++
++/// Build guard for synchronized full-duplex TLS state access.
++pub const AOS_TLS_IO_PATCH_VERSION: u32 = 1;
+ 
+ // Default MTU (TLS PDU) in bytes.
+ // NOTE: Since TLS is a byte-stream oriented transport, theoretically it has
+diff --git a/vendor/zenoh-link-tls/src/unicast.rs b/vendor/zenoh-link-tls/src/unicast.rs
+--- a/vendor/zenoh-link-tls/src/unicast.rs
++++ b/vendor/zenoh-link-tls/src/unicast.rs
+@@ -14,20 +14,19 @@
+ #[cfg(all(feature = "uring", target_os = "linux"))]
+ use std::os::fd::RawFd;
+ use std::{
+-    cell::UnsafeCell,
+     convert::TryInto,
+     fmt::{self, Debug},
+     net::SocketAddr,
+-    sync::Arc,
++    sync::{Arc, Weak},
+     time::Duration,
+ };
+ 
+ use async_trait::async_trait;
+ use time::OffsetDateTime;
+ use tokio::{
+-    io::{AsyncReadExt, AsyncWriteExt},
++    io::{AsyncReadExt, AsyncWriteExt, ReadHalf, WriteHalf},
+     net::{TcpListener, TcpStream},
+-    sync::Mutex as AsyncMutex,
++    sync::{Mutex as AsyncMutex, Notify},
+ };
+ use tokio_rustls::{TlsAcceptor, TlsConnector, TlsStream};
+ use tokio_util::sync::CancellationToken;
+@@ -53,32 +52,163 @@
+ #[derive(Default, Debug, PartialEq, Eq, Hash)]
+ pub struct TlsCommonName(String);
+ 
++// An already-due expiration task can run inside Arc::new_cyclic, where the
++// link's Weak cannot yet be upgraded. Keep a fully initialized target alive
++// and defer its link lookup until the containing Arc has been published.
++struct ReadyExpiration {
++    link: Weak<dyn LinkWithCertExpiration>,
++    ready: Notify,
++    #[cfg(test)]
++    entered: std::sync::atomic::AtomicBool,
++}
++
++#[async_trait]
++impl LinkWithCertExpiration for ReadyExpiration {
++    async fn expire(&self) -> ZResult<()> {
++        #[cfg(test)]
++        self.entered
++            .store(true, std::sync::atomic::Ordering::Release);
++        self.ready.notified().await;
++        if let Some(link) = self.link.upgrade() {
++            link.expire().await
++        } else {
++            Ok(())
++        }
++    }
++}
++
++struct ExpirationRegistration {
++    manager: LinkCertExpirationManager,
++    target: Arc<ReadyExpiration>,
++}
++
++impl ExpirationRegistration {
++    fn new(
++        link: Weak<dyn LinkWithCertExpiration>,
++        src_addr: SocketAddr,
++        dst_addr: SocketAddr,
++        expires: OffsetDateTime,
++    ) -> Self {
++        let target = Arc::new(ReadyExpiration {
++            link,
++            ready: Notify::new(),
++            #[cfg(test)]
++            entered: std::sync::atomic::AtomicBool::new(false),
++        });
++        let manager = LinkCertExpirationManager::new(
++            Arc::downgrade(&target) as Weak<dyn LinkWithCertExpiration>,
++            src_addr,
++            dst_addr,
++            TLS_LOCATOR_PREFIX,
++            expires,
++        );
++        Self { manager, target }
++    }
++
++    fn initialized(&self) {
++        // notify_one retains a permit if the one expiration task has not
++        // reached the gate yet. It must be called only after Arc construction.
++        self.target.ready.notify_one();
++    }
++}
++
++impl Drop for ExpirationRegistration {
++    fn drop(&mut self) {
++        // Also release the gate if construction unwinds; the weak link then
++        // cannot upgrade and the expiration task exits without retaining it.
++        self.target.ready.notify_one();
++    }
++}
++
++#[cfg(test)]
++mod expiration_initialization_tests {
++    use super::*;
++    use std::sync::atomic::{AtomicBool, Ordering};
++
++    struct TestLink {
++        expired: AtomicBool,
++        registration: ExpirationRegistration,
++    }
++
++    #[async_trait]
++    impl LinkWithCertExpiration for TestLink {
++        async fn expire(&self) -> ZResult<()> {
++            self.expired.store(true, Ordering::Release);
++            Ok(())
++        }
++    }
++
++    fn wait_until(mut ready: impl FnMut() -> bool) {
++        let limit = std::time::Instant::now() + Duration::from_secs(5);
++        while !ready() {
++            assert!(std::time::Instant::now() < limit);
++            std::thread::sleep(Duration::from_millis(1));
++        }
++    }
++
++    fn registration(weak: Weak<TestLink>) -> ExpirationRegistration {
++        ExpirationRegistration::new(
++            weak,
++            "127.0.0.1:1".parse().unwrap(),
++            "127.0.0.1:2".parse().unwrap(),
++            OffsetDateTime::now_utc() - time::Duration::seconds(1),
++        )
++    }
++
++    #[test]
++    fn already_due_expiration_waits_for_arc_initialization() {
++        let link = Arc::<TestLink>::new_cyclic(|weak| {
++            let registration = registration(weak.clone());
++            // Force the exact race: expiry is already executing, but the
++            // monitored link cannot yet be upgraded inside new_cyclic.
++            wait_until(|| registration.target.entered.load(Ordering::Acquire));
++            assert!(weak.upgrade().is_none());
++            TestLink {
++                expired: AtomicBool::new(false),
++                registration,
++            }
++        });
++        assert!(!link.expired.load(Ordering::Acquire));
++        link.registration.initialized();
++        zenoh_runtime::ZRuntime::Application
++            .block_in_place(link.registration.manager.wait_for_expiration_task())
++            .unwrap();
++        assert!(link.expired.load(Ordering::Acquire));
++    }
++
++    #[test]
++    fn failed_initialization_releases_the_expiration_task() {
++        let mut target = Weak::<ReadyExpiration>::new();
++        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
++            let _ = Arc::<TestLink>::new_cyclic(|weak| {
++                let registration = registration(weak.clone());
++                target = Arc::downgrade(&registration.target);
++                wait_until(|| registration.target.entered.load(Ordering::Acquire));
++                panic!("controlled initialization failure");
++            });
++        }));
++        assert!(result.is_err());
++        wait_until(|| target.upgrade().is_none());
++    }
++}
++
+ pub struct LinkUnicastTls {
+-    // The underlying socket as returned from the async-rustls library
+-    // NOTE: TlsStream requires &mut for read and write operations. This means
+-    //       that concurrent reads and writes are not possible. To achieve that,
+-    //       we use an UnsafeCell for interior mutability. Using an UnsafeCell
+-    //       is safe in our case since the transmission and reception logic
+-    //       already ensures that no concurrent reads or writes can happen on
+-    //       the same stream: there is only one task at the time that writes on
+-    //       the stream and only one task at the time that reads from the stream.
+-    inner: UnsafeCell<TlsStream<TcpStream>>,
++    // TLS reads and writes both mutate the same rustls connection. Tokio's
++    // split halves serialize each poll of that state, releasing the shared
++    // lock on Pending so an idle read cannot block a write or shutdown.
++    // The outer locks preserve ordering within each direction across awaits.
++    reader: AsyncMutex<ReadHalf<TlsStream<TcpStream>>>,
++    writer: AsyncMutex<WriteHalf<TlsStream<TcpStream>>>,
+     // The source socket address of this link (address used on the local host)
+     src_addr: SocketAddr,
+     src_locator: Locator,
+     // The destination socket address of this link (address used on the local host)
+     dst_addr: SocketAddr,
+     dst_locator: Locator,
+-    // Make sure there are no concurrent read or writes
+-    write_mtx: AsyncMutex<()>,
+-    read_mtx: AsyncMutex<()>,
+     auth_identifier: LinkAuthId,
+     mtu: BatchSize,
+-    expiration_manager: Option<LinkCertExpirationManager>,
+-}
+-
+-unsafe impl Send for LinkUnicastTls {}
+-unsafe impl Sync for LinkUnicastTls {}
++    expiration_manager: Option<ExpirationRegistration>,
++}
+ 
+ impl LinkUnicastTls {
+     fn new(
+@@ -86,7 +216,7 @@
+         src_addr: SocketAddr,
+         dst_addr: SocketAddr,
+         auth_identifier: LinkAuthId,
+-        expiration_manager: Option<LinkCertExpirationManager>,
++        expiration_manager: Option<ExpirationRegistration>,
+     ) -> LinkUnicastTls {
+         let (tcp_stream, _) = socket.get_ref();
+         // Set the TLS nodelay option
+@@ -135,39 +265,53 @@
+             mtu = (mtu as u32).min(tgt) as BatchSize;
+         }
+ 
++        let (reader, writer) = tokio::io::split(socket);
+         // Build the Tls object
+         LinkUnicastTls {
+-            inner: UnsafeCell::new(socket),
++            reader: AsyncMutex::new(reader),
++            writer: AsyncMutex::new(writer),
+             src_addr,
+             src_locator: Locator::new(TLS_LOCATOR_PREFIX, src_addr.to_string(), "").unwrap(),
+             dst_addr,
+             dst_locator: Locator::new(TLS_LOCATOR_PREFIX, dst_addr.to_string(), "").unwrap(),
+-            write_mtx: AsyncMutex::new(()),
+-            read_mtx: AsyncMutex::new(()),
+             auth_identifier,
+             mtu,
+             expiration_manager,
+         }
+     }
+ 
+-    // NOTE: It is safe to suppress Clippy warning since no concurrent reads
+-    //       or concurrent writes will ever happen. The read_mtx and write_mtx
+-    //       are respectively acquired in any read and write operation.
+-    #[allow(clippy::mut_from_ref)]
+-    fn get_mut_socket(&self) -> &mut TlsStream<TcpStream> {
+-        unsafe { &mut *self.inner.get() }
++    fn monitored(
++        socket: TlsStream<TcpStream>,
++        src_addr: SocketAddr,
++        dst_addr: SocketAddr,
++        auth_identifier: LinkAuthId,
++        expiration: Option<OffsetDateTime>,
++    ) -> ZResult<Arc<Self>> {
++        // Handshake validity has second precision. Do not admit a new link
++        // whose monitored certificate has already reached its exact deadline.
++        if expiration.is_some_and(|expires| expires <= OffsetDateTime::now_utc()) {
++            bail!("Remote TLS certificate chain has expired");
++        }
++        let link = Arc::new_cyclic(|weak: &Weak<Self>| {
++            let registration = expiration.map(|expires| {
++                ExpirationRegistration::new(weak.clone(), src_addr, dst_addr, expires)
++            });
++            Self::new(socket, src_addr, dst_addr, auth_identifier, registration)
++        });
++        if let Some(registration) = &link.expiration_manager {
++            registration.initialized();
++        }
++        Ok(link)
+     }
+ 
+     async fn close(&self) -> ZResult<()> {
+         tracing::trace!("Closing TLS link: {}", self);
+-        // Flush the TLS stream
+-        let _guard = zasynclock!(self.write_mtx);
+-        let tls_stream = self.get_mut_socket();
+-        let res = tls_stream.flush().await;
++        let mut writer = zasynclock!(self.writer);
++        let res = writer.flush().await;
+         tracing::trace!("TLS link flush {}: {:?}", self, res);
+-        // Close the underlying TCP stream
+-        let (tcp_stream, _) = tls_stream.get_mut();
+-        let res = tcp_stream.shutdown().await;
++        // Send close_notify before shutting down TCP. This uses the same
++        // shared poll lock as reads; it never borrows the TLS state twice.
++        let res = writer.shutdown().await;
+         tracing::trace!("TLS link shutdown {}: {:?}", self, res);
+         res.map_err(|e| zerror!(e).into())
+     }
+@@ -176,7 +320,8 @@
+ #[async_trait]
+ impl LinkUnicastTrait for LinkUnicastTls {
+     async fn close(&self) -> ZResult<()> {
+-        if let Some(expiration_manager) = &self.expiration_manager {
++        if let Some(registration) = &self.expiration_manager {
++            let expiration_manager = &registration.manager;
+             if !expiration_manager.set_closing() {
+                 // expiration_task is closing link, return its returned ZResult to Transport
+                 return expiration_manager.wait_for_expiration_task().await;
+@@ -191,39 +336,47 @@
+     }
+ 
+     async fn write(&self, buffer: &[u8], _priority: Option<Priority>) -> ZResult<usize> {
+-        let _guard = zasynclock!(self.write_mtx);
+-        self.get_mut_socket().write(buffer).await.map_err(|e| {
++        let mut writer = zasynclock!(self.writer);
++        let written = writer.write(buffer).await.map_err(|e| {
+             tracing::trace!("Write error on TLS link {}: {}", self, e);
++            zerror!(e)
++        })?;
++        // tokio-rustls may accept plaintext while encrypted bytes remain
++        // buffered. Deliver the whole accepted write before releasing its
++        // operation lock; an idle link has no later write to flush it.
++        writer.flush().await.map_err(|e| {
++            tracing::trace!("Flush error on TLS link {}: {}", self, e);
++            zerror!(e)
++        })?;
++        Ok(written)
++    }
++
++    async fn write_all(&self, buffer: &[u8], _priority: Option<Priority>) -> ZResult<()> {
++        let mut writer = zasynclock!(self.writer);
++        writer.write_all(buffer).await.map_err(|e| {
++            tracing::trace!("Write error on TLS link {}: {}", self, e);
++            zerror!(e)
++        })?;
++        writer.flush().await.map_err(|e| {
++            tracing::trace!("Flush error on TLS link {}: {}", self, e);
+             zerror!(e).into()
+         })
+     }
+ 
+-    async fn write_all(&self, buffer: &[u8], _priority: Option<Priority>) -> ZResult<()> {
+-        let _guard = zasynclock!(self.write_mtx);
+-        self.get_mut_socket().write_all(buffer).await.map_err(|e| {
+-            tracing::trace!("Write error on TLS link {}: {}", self, e);
+-            zerror!(e).into()
+-        })
+-    }
+-
+     async fn read(&self, buffer: &mut [u8], _priority: Option<Priority>) -> ZResult<usize> {
+-        let _guard = zasynclock!(self.read_mtx);
+-        self.get_mut_socket().read(buffer).await.map_err(|e| {
++        let mut reader = zasynclock!(self.reader);
++        reader.read(buffer).await.map_err(|e| {
+             tracing::trace!("Read error on TLS link {}: {}", self, e);
+             zerror!(e).into()
+         })
+     }
+ 
+     async fn read_exact(&self, buffer: &mut [u8], _priority: Option<Priority>) -> ZResult<()> {
+-        let _guard = zasynclock!(self.read_mtx);
+-        let _ = self
+-            .get_mut_socket()
+-            .read_exact(buffer)
+-            .await
+-            .map_err(|e| {
+-                tracing::trace!("Read error on TLS link {}: {}", self, e);
+-                zerror!(e)
+-            })?;
++        let mut reader = zasynclock!(self.reader);
++        let _ = reader.read_exact(buffer).await.map_err(|e| {
++            tracing::trace!("Read error on TLS link {}: {}", self, e);
++            zerror!(e)
++        })?;
+         Ok(())
+     }
+ 
+@@ -275,6 +428,7 @@
+             .expiration_manager
+             .as_ref()
+             .expect("expiration_manager should be set");
++        let expiration_manager = &expiration_manager.manager;
+         if expiration_manager.set_closing() {
+             return self.close().await;
+         }
+@@ -283,14 +437,9 @@
+     }
+ }
+ 
+-impl Drop for LinkUnicastTls {
+-    fn drop(&mut self) {
+-        // Close the underlying TCP stream
+-        let (tcp_stream, _) = self.get_mut_socket().get_mut();
+-        let _ = zenoh_runtime::ZRuntime::Acceptor
+-            .block_in_place(async move { tcp_stream.shutdown().await });
+-    }
+-}
++// Dropping both split halves drops the owned TcpStream and closes its socket.
++// Explicit close/expiration sends close_notify; Drop must not enter a runtime
++// or manufacture an alias to a stream owned by another half.
+ 
+ impl fmt::Display for LinkUnicastTls {
+     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+@@ -388,26 +537,15 @@
+ 
+         let tls_stream = TlsStream::Client(tls_stream);
+ 
+-        let link = Arc::<LinkUnicastTls>::new_cyclic(|weak_link| {
+-            let mut expiration_manager = None;
+-            if client_config.tls_close_link_on_expiration {
+-                // setup expiration manager
+-                expiration_manager = Some(LinkCertExpirationManager::new(
+-                    weak_link.clone(),
+-                    src_addr,
+-                    dst_addr,
+-                    TLS_LOCATOR_PREFIX,
+-                    certchain_expiration_time,
+-                ))
+-            }
+-            LinkUnicastTls::new(
+-                tls_stream,
+-                src_addr,
+-                dst_addr,
+-                auth_identifier.into(),
+-                expiration_manager,
+-            )
+-        });
++        let link = LinkUnicastTls::monitored(
++            tls_stream,
++            src_addr,
++            dst_addr,
++            auth_identifier.into(),
++            client_config
++                .tls_close_link_on_expiration
++                .then_some(certchain_expiration_time),
++        )?;
+ 
+         Ok(LinkUnicast::from(link as Arc<dyn LinkUnicastTrait>))
+     }
+@@ -557,26 +695,19 @@
+ 
+                         tracing::debug!("Accepted TLS connection on {:?}: {:?}. {:?}.", src_addr, dst_addr, auth_identifier);
+                         // Create the new link object
+-                        let link = Arc::<LinkUnicastTls>::new_cyclic(|weak_link| {
+-                            let mut expiration_manager = None;
+-                            if let Some(certchain_expiration_time) = maybe_expiration_time {
+-                                // setup expiration manager
+-                                expiration_manager = Some(LinkCertExpirationManager::new(
+-                                    weak_link.clone(),
+-                                    src_addr,
+-                                    dst_addr,
+-                                    TLS_LOCATOR_PREFIX,
+-                                    certchain_expiration_time,
+-                                ));
++                        let link = match LinkUnicastTls::monitored(
++                            tokio_rustls::TlsStream::Server(tls_stream),
++                            src_addr,
++                            dst_addr,
++                            auth_identifier.into(),
++                            maybe_expiration_time,
++                        ) {
++                            Ok(link) => link,
++                            Err(error) => {
++                                tracing::warn!("Rejecting expired TLS connection: {error}");
++                                continue;
+                             }
+-                            LinkUnicastTls::new(
+-                                tokio_rustls::TlsStream::Server(tls_stream),
+-                                src_addr,
+-                                dst_addr,
+-                                auth_identifier.into(),
+-                                expiration_manager,
+-                            )
+-                        });
++                        };
+ 
+                         // Communicate the new link to the initial transport manager
+                         if let Err(e) = manager
+@@ -679,3 +810,257 @@
+         LinkAuthId::Tls(value.auth_value.clone())
+     }
+ }
++
++#[cfg(test)]
++mod duplex_tests {
++    use super::*;
++    use rustls_pki_types::{CertificateDer, PrivateKeyDer, ServerName};
++    use std::{
++        fs,
++        io::BufReader,
++        path::PathBuf,
++        process::Command,
++        sync::atomic::{AtomicU64, Ordering},
++    };
++
++    struct Certificate {
++        directory: PathBuf,
++        cert: CertificateDer<'static>,
++        key: PrivateKeyDer<'static>,
++    }
++
++    impl Certificate {
++        fn new() -> Self {
++            static NEXT: AtomicU64 = AtomicU64::new(0);
++            let directory = std::env::temp_dir().join(format!(
++                "aos-tls-duplex-{}-{}-{}",
++                std::process::id(),
++                time::OffsetDateTime::now_utc().unix_timestamp_nanos(),
++                NEXT.fetch_add(1, Ordering::Relaxed),
++            ));
++            fs::create_dir(&directory).unwrap();
++            #[cfg(unix)]
++            {
++                use std::os::unix::fs::PermissionsExt;
++                fs::set_permissions(&directory, fs::Permissions::from_mode(0o700)).unwrap();
++            }
++            let output = Command::new("openssl")
++                .args([
++                    "req",
++                    "-x509",
++                    "-newkey",
++                    "ec",
++                    "-pkeyopt",
++                    "ec_paramgen_curve:prime256v1",
++                    "-nodes",
++                    "-sha256",
++                    "-days",
++                    "2",
++                    "-subj",
++                    "/CN=localhost",
++                    "-addext",
++                    "subjectAltName=IP:127.0.0.1",
++                    "-addext",
++                    "basicConstraints=critical,CA:FALSE",
++                    "-keyout",
++                    "key.pem",
++                    "-out",
++                    "cert.pem",
++                ])
++                .current_dir(&directory)
++                .output()
++                .expect("OpenSSL is required for the TLS transport regression");
++            assert!(
++                output.status.success(),
++                "{}",
++                String::from_utf8_lossy(&output.stderr)
++            );
++            let cert = rustls_pemfile::certs(&mut BufReader::new(
++                fs::File::open(directory.join("cert.pem")).unwrap(),
++            ))
++            .next()
++            .unwrap()
++            .unwrap();
++            let key = rustls_pemfile::private_key(&mut BufReader::new(
++                fs::File::open(directory.join("key.pem")).unwrap(),
++            ))
++            .unwrap()
++            .unwrap();
++            Self {
++                directory,
++                cert,
++                key,
++            }
++        }
++
++        async fn pair(&self) -> (Arc<LinkUnicastTls>, Arc<LinkUnicastTls>) {
++            let crypto = Arc::new(rustls::crypto::ring::default_provider());
++            let server = rustls::ServerConfig::builder_with_provider(crypto.clone())
++                .with_safe_default_protocol_versions()
++                .unwrap()
++                .with_no_client_auth()
++                .with_single_cert(vec![self.cert.clone()], self.key.clone_key())
++                .unwrap();
++            let mut roots = rustls::RootCertStore::empty();
++            roots.add(self.cert.clone()).unwrap();
++            let client = rustls::ClientConfig::builder_with_provider(crypto)
++                .with_safe_default_protocol_versions()
++                .unwrap()
++                .with_root_certificates(roots)
++                .with_no_client_auth();
++            let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
++            let address = listener.local_addr().unwrap();
++            let accept = tokio::spawn(async move {
++                let (tcp, remote) = listener.accept().await.unwrap();
++                let tls = TlsAcceptor::from(Arc::new(server))
++                    .accept(tcp)
++                    .await
++                    .unwrap();
++                Arc::new(LinkUnicastTls::new(
++                    TlsStream::Server(tls),
++                    address,
++                    remote,
++                    LinkAuthId::Tls(None),
++                    None,
++                ))
++            });
++            let tcp = TcpStream::connect(address).await.unwrap();
++            let local = tcp.local_addr().unwrap();
++            let tls = TlsConnector::from(Arc::new(client))
++                .connect(ServerName::try_from("127.0.0.1").unwrap(), tcp)
++                .await
++                .unwrap();
++            let client = Arc::new(LinkUnicastTls::new(
++                TlsStream::Client(tls),
++                local,
++                address,
++                LinkAuthId::Tls(None),
++                None,
++            ));
++            (client, accept.await.unwrap())
++        }
++    }
++
++    impl Drop for Certificate {
++        fn drop(&mut self) {
++            let _ = fs::remove_dir_all(&self.directory);
++        }
++    }
++
++    fn runtime() -> tokio::runtime::Runtime {
++        tokio::runtime::Builder::new_multi_thread()
++            .worker_threads(4)
++            .enable_all()
++            .build()
++            .unwrap()
++    }
++
++    #[test]
++    fn simultaneous_tls_reads_and_writes_preserve_every_frame() {
++        let certificate = Certificate::new();
++        runtime().block_on(async {
++            tokio::time::timeout(Duration::from_secs(30), async {
++                let (client, server) = certificate.pair().await;
++                let start = Arc::new(tokio::sync::Barrier::new(4));
++                let mut senders = Vec::new();
++                let mut receivers = Vec::new();
++                // Each end sends and receives on separate runtime workers.
++                // Compare every byte, including sequence, across TLS records.
++                for (link, sending, marker) in [
++                    (client.clone(), true, 0x51),
++                    (server.clone(), false, 0x51),
++                    (server.clone(), true, 0xa7),
++                    (client.clone(), false, 0xa7),
++                ] {
++                    let start = start.clone();
++                    let task = tokio::spawn(async move {
++                        let mut frame = vec![marker; 64 * 1024];
++                        start.wait().await;
++                        for sequence in 0u64..256 {
++                            if sending {
++                                frame[..8].copy_from_slice(&sequence.to_be_bytes());
++                                if sequence % 2 == 0 {
++                                    link.write_all(&frame, None).await.unwrap();
++                                } else {
++                                    let mut offset = 0;
++                                    while offset < frame.len() {
++                                        let written =
++                                            link.write(&frame[offset..], None).await.unwrap();
++                                        assert!(written > 0);
++                                        offset += written;
++                                    }
++                                }
++                            } else {
++                                link.read_exact(&mut frame, None).await.unwrap();
++                                assert_eq!(&frame[..8], &sequence.to_be_bytes());
++                                assert!(frame[8..].iter().all(|value| *value == marker));
++                            }
++                        }
++                    });
++                    if sending {
++                        senders.push(task);
++                    } else {
++                        receivers.push(task);
++                    }
++                }
++                for task in senders {
++                    task.await.unwrap();
++                }
++                // No explicit flush, close, or subsequent write may be
++                // needed to deliver the last TLS record to either receiver.
++                for task in receivers {
++                    task.await.unwrap();
++                }
++                client.close().await.unwrap();
++                server.close().await.unwrap();
++            })
++            .await
++            .expect("full-duplex TLS traffic stalled");
++        });
++    }
++
++    #[test]
++    fn pending_read_does_not_block_write_or_tls_shutdown() {
++        let certificate = Certificate::new();
++        runtime().block_on(async {
++            tokio::time::timeout(Duration::from_secs(5), async {
++                let (client, server) = certificate.pair().await;
++                let pending_client = client.clone();
++                let pending =
++                    tokio::spawn(async move { pending_client.read_exact(&mut [0; 1], None).await });
++                tokio::time::sleep(Duration::from_millis(30)).await;
++                assert!(!pending.is_finished());
++                client.write_all(b"probe", None).await.unwrap();
++                let mut data = [0; 5];
++                server.read_exact(&mut data, None).await.unwrap();
++                assert_eq!(&data, b"probe");
++                assert!(!pending.is_finished());
++                client.close().await.unwrap();
++                // A graceful TLS close is EOF, not UnexpectedEof from a bare
++                // TCP shutdown without close_notify.
++                assert_eq!(server.read(&mut [0; 1], None).await.unwrap(), 0);
++                server.close().await.unwrap();
++                assert!(pending.await.unwrap().is_err());
++            })
++            .await
++            .expect("pending TLS read blocked write or close");
++        });
++    }
++
++    #[test]
++    fn dropping_link_closes_socket_without_entering_a_runtime() {
++        let certificate = Certificate::new();
++        let runtime = runtime();
++        let (client, server) = runtime.block_on(certificate.pair());
++        // Drop outside a Tokio enter guard. The remaining peer must observe
++        // socket closure even when explicit graceful close was not called.
++        drop(client);
++        runtime.block_on(async {
++            let result =
++                tokio::time::timeout(Duration::from_secs(2), server.read(&mut [0; 1], None))
++                    .await
++                    .expect("dropped TLS socket remained open");
++            assert!(result.is_err() || result.unwrap() == 0);
++        });
++    }
++}
+diff --git a/vendor/zenoh-link-tls/src/utils.rs b/vendor/zenoh-link-tls/src/utils.rs
+--- a/vendor/zenoh-link-tls/src/utils.rs
++++ b/vendor/zenoh-link-tls/src/utils.rs
+@@ -318,6 +318,8 @@
+     pub(crate) client_config: ClientConfig,
+     pub(crate) tls_close_link_on_expiration: bool,
+     pub(crate) tcp_socket_config: TcpSocketConfig<'a>,
++    #[cfg(test)]
++    root_cert_store_len: usize,
+ }
+ 
+ impl<'a> TlsClientConfig<'a> {
+@@ -346,16 +348,9 @@
+             None => TLS_CLOSE_LINK_ON_EXPIRATION_DEFAULT,
+         };
+ 
+-        // Allows mixed user-generated CA and webPKI CA
+-        tracing::debug!("Loading default Web PKI certificates.");
+-        let mut root_cert_store = RootCertStore {
+-            roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+-        };
+-
+-        if let Some(custom_root_cert) = load_trust_anchors(config)? {
+-            tracing::debug!("Loading user-generated certificates.");
+-            root_cert_store.extend(custom_root_cert.roots);
+-        }
++        // AOS: an explicit CA is an exclusive trust boundary. Preserve upstream
++        // public Web PKI roots only when the caller supplies no custom CA.
++        let root_cert_store = client_trust_store(load_trust_anchors(config)?);
+ 
+         // Install ring based rustls CryptoProvider.
+         rustls::crypto::ring::default_provider()
+@@ -366,6 +361,11 @@
+             // Ignore the error here, because `rustls::crypto::ring::default_provider().install_default()` will inevitably be executed multiple times
+             // when there are multiple quic links, and all but the first execution will fail.
+             .ok();
++
++        // Observe the same store consumed by the rustls builder below, rather
++        // than rebuilding a second store in tests. No runtime field is added.
++        #[cfg(test)]
++        let root_cert_store_len = root_cert_store.len();
+ 
+         let cc = if tls_client_server_auth {
+             tracing::debug!("Loading client authentication key and certificate...");
+@@ -455,6 +455,8 @@
+         Ok(TlsClientConfig {
+             client_config: cc,
+             tls_close_link_on_expiration,
++            #[cfg(test)]
++            root_cert_store_len,
+             tcp_socket_config: TcpSocketConfig::new(
+                 tcp_tx_buffer_size,
+                 tcp_rx_buffer_size,
+@@ -605,3 +607,112 @@
+ pub fn get_tls_server_name<'a>(address: &'a Address<'a>) -> ZResult<ServerName<'a>> {
+     Ok(ServerName::try_from(get_tls_host(address)?).map_err(|e| zerror!(e))?)
+ }
++
++// AOS local patch. This deliberately changes explicit-CA client semantics;
++// server-side mTLS client verification is unchanged. See AOS-PATCH.md.
++fn client_trust_store(custom: Option<RootCertStore>) -> RootCertStore {
++    custom.unwrap_or_else(|| RootCertStore {
++        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
++    })
++}
++
++#[cfg(test)]
++mod aos_private_roots_tests {
++    use super::*;
++    use zenoh_protocol::core::EndPoint;
++
++    // Public, self-signed test CA only; its private key was discarded. This
++    // fixture exercises PEM loading and root-store construction, not a TLS
++    // handshake, so the certificate's validity dates do not affect the test.
++    const TEST_CA: &str = "-----BEGIN CERTIFICATE-----
++MIIDNTCCAh2gAwIBAgIUVVeiRL66iOA3jN0/IXJ2Mk5iBU8wDQYJKoZIhvcNAQEL
++BQAwKjEoMCYGA1UEAwwfQU9TIHJvb3Qtc3RvcmUgY29uc3RydWN0b3IgdGVzdDAe
++Fw0yNjEwMjAyMzA0MTJaFw0yNjEwMjEyMzA0MTJaMCoxKDAmBgNVBAMMH0FPUyBy
++b290LXN0b3JlIGNvbnN0cnVjdG9yIHRlc3QwggEiMA0GCSqGSIb3DQEBAQUAA4IB
++DwAwggEKAoIBAQDrO5Mi230B08MygTVgAnb8RDS62VAFU1vOXbOPBMwfOYknmM9v
++CXfN4b6KPMEyJmvYBXKAQaUIDe+/j2EMtfyxcFYB9Ip9efPKohx/R6xhn8SlY/XI
++mfaJj/PwtPXhQdbGa1pIvmYFlaa4M5IgBRdeeuggIjII1L44xps5ZUlg0R5mlR8o
++rI25ep6RuZjgbGtkwuW5uwzWxL7rO8x+dRAQUTzDNPLUL3pESawa/h1f2PGH8ze8
++8/DZYAT7b/EKycN7mo7Hqrnk8wWxQFaQ2usMmoRbSR7xKW1RFs/SbAuW9mv8/jw9
++xk2mqMQt95HwUAbv6OfJwEWOpHixjxhgTSQNAgMBAAGjUzBRMB0GA1UdDgQWBBRp
++y8Y6G6kiHiZarw1kfyUo/a6HITAfBgNVHSMEGDAWgBRpy8Y6G6kiHiZarw1kfyUo
++/a6HITAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQB8RlJ0bAaf
++vn0Ydl3uxkV28TGiilrBhXx6+jOX59tTCSD8nTXazj+flMmz2U9YSU47BPGYGDkz
++sXuvbQ+AkW6uWGvlI3dTCWPvyZZlilJ0BBrxG1zXXUUYnzLGhRS9qY0l6krDyc+1
++QzQMrlYDUvaurSsxVVQQ2sBej/w7L9jckalsUnxt0eR5zR37b9WKEia/eYxeCvD3
++5wpE8QNGctoKrEGANLIfweSIucFutIExoko9pU1PdlBeghVEBQKw/xx8WHeEOfkC
++EEyo3B1HX9+lzzy1s7iDB31qJ9SGf6nEN364sEyqEbxf3yVer7gIIUJqpmvax7Lz
++6Wtq7Pvp/Qan
++-----END CERTIFICATE-----
++";
++
++    fn configured_client_root_count(ca: Option<&str>) -> usize {
++        let mut endpoint = EndPoint::from_str("tls/127.0.0.1:7447").unwrap();
++        endpoint
++            .config_mut()
++            .insert(TLS_ENABLE_MTLS, "false")
++            .unwrap();
++        endpoint
++            .config_mut()
++            .insert(TLS_VERIFY_NAME_ON_CONNECT, "true")
++            .unwrap();
++        if let Some(ca) = ca {
++            endpoint
++                .config_mut()
++                .insert(TLS_ROOT_CA_CERTIFICATE_RAW, ca)
++                .unwrap();
++        }
++        let config = endpoint.config();
++        assert_eq!(config.get(TLS_ROOT_CA_CERTIFICATE_RAW), ca);
++        let runtime = tokio::runtime::Builder::new_current_thread()
++            .enable_all()
++            .build()
++            .unwrap();
++        // This is the production constructor. It parses the configured PEM
++        // and moves the observed RootCertStore into rustls without connecting.
++        let client = runtime.block_on(TlsClientConfig::new(&config)).unwrap();
++        client.root_cert_store_len
++    }
++
++    #[test]
++    fn constructor_uses_only_the_single_explicit_ca() {
++        let roots = configured_client_root_count(Some(TEST_CA));
++        eprintln!("TlsClientConfig::new explicit_one_ca roots={roots}");
++        assert_eq!(roots, 1);
++    }
++
++    #[test]
++    fn constructor_keeps_an_explicit_empty_ca_store_empty() {
++        let roots = configured_client_root_count(Some(""));
++        eprintln!("TlsClientConfig::new explicit_empty_ca roots={roots}");
++        assert_eq!(roots, 0);
++    }
++
++    #[test]
++    fn constructor_without_ca_uses_the_upstream_public_roots() {
++        let roots = configured_client_root_count(None);
++        eprintln!("TlsClientConfig::new absent_ca roots={roots}");
++        assert_eq!(roots, webpki_roots::TLS_SERVER_ROOTS.len());
++        assert_ne!(roots, 0);
++    }
++
++    #[test]
++    fn explicit_roots_are_not_augmented_by_public_roots() {
++        // Distinguish replacement from the original extend behavior without
++        // relying on a public CA private key or a network service.
++        let one = RootCertStore {
++            roots: vec![webpki_roots::TLS_SERVER_ROOTS[0].clone()],
++        };
++        let store = client_trust_store(Some(one));
++        assert_eq!(store.len(), 1);
++        assert_eq!(store.roots[0], webpki_roots::TLS_SERVER_ROOTS[0]);
++        assert!(client_trust_store(Some(RootCertStore::empty())).is_empty());
++    }
++
++    #[test]
++    fn absent_custom_ca_preserves_upstream_public_roots() {
++        let store = client_trust_store(None);
++        assert_eq!(store.roots, webpki_roots::TLS_SERVER_ROOTS);
++        assert!(!store.is_empty());
++    }
++}

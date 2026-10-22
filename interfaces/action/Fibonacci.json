@@ -1,0 +1,33 @@
+{
+  "name": "aos_examples/action/Fibonacci",
+  "kind": "action",
+  "goal": {
+    "type": "object",
+    "properties": {
+      "order": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 40,
+        "description": "How many Fibonacci numbers to compute."
+      }
+    },
+    "required": ["order"],
+    "additionalProperties": false,
+    "examples": [{"order": 8}]
+  },
+  "result": {
+    "type": "object",
+    "properties": {"sequence": {"type": "array", "items": {"type": "integer"}}},
+    "required": ["sequence"],
+    "additionalProperties": false,
+    "default": {"sequence": []}
+  },
+  "feedback": {
+    "type": "object",
+    "properties": {
+      "partial_sequence": {"type": "array", "items": {"type": "integer"}}
+    },
+    "required": ["partial_sequence"],
+    "additionalProperties": false
+  }
+}

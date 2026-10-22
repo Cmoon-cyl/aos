@@ -1,0 +1,81 @@
+{
+  "schema_version": 1,
+  "mode": "baseline",
+  "duration_seconds": 900,
+  "warmup_seconds": 300,
+  "sample_seconds": 1.0,
+  "maximum_sample_gap_seconds": 8.0,
+  "operation_timeout_seconds": 5.0,
+  "startup_timeout_seconds": 60,
+  "shutdown_timeout_seconds": 45,
+  "quiet_seconds": 3,
+  "domain_id": 74187,
+  "workload": {
+    "small_topic": {
+      "payload_bytes": 1024,
+      "hz": 100.0,
+      "fast_consumers": 2,
+      "slow_consumers": 1,
+      "slow_delay_seconds": 0.05,
+      "depth": 10
+    },
+    "large_topic": {
+      "payload_bytes": 262144,
+      "hz": 10.0,
+      "depth": 10
+    },
+    "service": {
+      "payload_bytes": 1024,
+      "hz": 20.0,
+      "concurrency": 4
+    },
+    "action": {
+      "concurrency": 8,
+      "duration_seconds": 30,
+      "feedback_hz": 10.0,
+      "cancel_every": 4,
+      "cancel_duration_seconds": 30
+    },
+    "churn": {
+      "rounds": 100,
+      "interval_seconds": 5
+    },
+    "management": {
+      "interval_seconds": 4.0
+    },
+    "bag": {
+      "enabled": true,
+      "total_bytes": 2147483648,
+      "queue_messages": 256,
+      "queue_bytes": 16777216,
+      "adapter_queue_bytes": 16777216,
+      "message_bytes": 1048576
+    }
+  },
+  "faults": [],
+  "storage": {
+    "logs_bytes_per_process": 16777216,
+    "resource_log_bytes": 67108864,
+    "worker_log_bytes": 268435456,
+    "maximum_disk_bytes": 4294967296
+  },
+  "thresholds": {
+    "rss_bytes_per_process": 2147483648,
+    "fd_per_process": 2048,
+    "threads_per_process": 256,
+    "rss_growth_bytes_per_hour": null,
+    "fd_growth_per_hour": null,
+    "threads_growth_per_hour": null,
+    "service_latency_p99_seconds": null,
+    "action_accept_p99_seconds": null,
+    "action_cancel_p99_seconds": null,
+    "fast_topic_loss_fraction": null,
+    "large_topic_loss_fraction": null,
+    "require_queue_byte_stats": true,
+    "maximum_business_silence_seconds": 60
+  },
+  "freeze": null,
+  "transport": "tcp",
+  "workload_case": "mixed",
+  "rounds": 3
+}

@@ -1,0 +1,102 @@
+{
+  "name": "aos_memory/srv/Get",
+  "kind": "srv",
+  "request": {
+    "type": "object",
+    "properties": {
+      "key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128,
+        "pattern": "^[A-Za-z0-9][A-Za-z0-9_./:-]*$"
+      }
+    },
+    "required": [
+      "key"
+    ],
+    "additionalProperties": false,
+    "examples": [
+      {
+        "key": "synthetic/note-1"
+      }
+    ]
+  },
+  "response": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean"
+      },
+      "code": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "message": {
+        "type": "string",
+        "maxLength": 256
+      },
+      "data": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_./:-]*$"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "description": "SHA-256 of the exact UTF-8 text or JSONL file bytes, as specified by this endpoint."
+              },
+              "text_bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "commit_seq": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "updated_unix_ns": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "text": {
+                "type": "string",
+                "description": "Committed UTF-8 note text."
+              }
+            },
+            "required": [
+              "key",
+              "revision",
+              "sha256",
+              "text_bytes",
+              "commit_seq",
+              "updated_unix_ns",
+              "text"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Successful business value, or null for a named business error. Transport errors and timeouts are separate."
+      }
+    },
+    "required": [
+      "ok",
+      "code",
+      "message",
+      "data"
+    ],
+    "additionalProperties": false
+  }
+}

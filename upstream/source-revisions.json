@@ -1,0 +1,44 @@
+{
+  "rcl": {
+    "repository": "ros2/rcl",
+    "commit": "18d96c9c2b98e616324ae9a2c7701dd0b0886ff0",
+    "baseline": "jazzy"
+  },
+  "rclpy": {
+    "repository": "ros2/rclpy",
+    "commit": "4e607c09d624debc39a4ae5405680c06d87fac35",
+    "baseline": "jazzy"
+  },
+  "rcl_interfaces": {
+    "repository": "ros2/rcl_interfaces",
+    "commit": "7aa3caf43377ea6ad615bc1040832e2c7566bfbe",
+    "baseline": "jazzy"
+  },
+  "rmw": {
+    "repository": "ros2/rmw",
+    "commit": "8cb94a87cf3f4049abe2d563af893517bf336930",
+    "baseline": "jazzy"
+  },
+  "ros2cli": {
+    "repository": "ros2/ros2cli",
+    "commit": "a71e5b3c982384aa8081202f8b21a189f0eb7ce7",
+    "baseline": "jazzy"
+  },
+  "hiroz": {
+    "repository": "ZettaScaleLabs/hiroz",
+    "commit": "d9f979a0404311de12f6884bafaa9b20600eb490",
+    "baseline": "main snapshot"
+  },
+  "zenoh": {
+    "repository": "eclipse-zenoh/zenoh",
+    "commit": "1211779c3647f5a96713dade452c546a07823580",
+    "baseline": "1.10.1",
+    "local_patch": "upstream/patches/zenoh-1.10.1-liveliness-history.patch",
+    "crate_archive_sha256": "453ba5d28a1197653aae4bb024fd74a9d5c7051d5a19a77f3a43d83f40c22584"
+  },
+  "rmw_zenoh": {
+    "repository": "ros2/rmw_zenoh",
+    "commit": "dda52d6d9bc863b4b6c86a0b4fd1c6788f4a651e",
+    "baseline": "rolling reference only"
+  }
+}

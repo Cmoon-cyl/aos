@@ -1,0 +1,47 @@
+{
+  "added_files": [
+    "AOS-PATCH.md",
+    "LICENSE",
+    "NOTICE.md"
+  ],
+  "archive_sha256": "cce65fd71b4631821a85058542e28faac0151af6c53cd61f2dfafc7e16c4d6c4",
+  "changed_original_files": [
+    "src/lib.rs",
+    "src/unicast.rs",
+    "src/utils.rs"
+  ],
+  "crate": "zenoh-link-tls",
+  "final_files": {
+    ".cargo_vcs_info.json": "7af90d5f1ced67374caa9a9bd8816ce81444598775990fed1140fcddfc0afec6",
+    "AOS-PATCH.md": "ad68f5478c7463a949fd02864f8fd8a593a1044c0703f64aeb94bed475f9acdb",
+    "Cargo.lock": "f5a97d9f85fa3a856b223ce96483e7d256771cb2c1f9c6c71e40414efb2afc88",
+    "Cargo.toml": "a5b4dbedecdab5c236a0939e57d627a0e1a96269e589e87c66f8868c72095c12",
+    "Cargo.toml.orig": "23d7cabb6f7ee09d605478d9877a1a839125d789c56910526161e1bd4b714503",
+    "LICENSE": "01a44774f7b1a453595c7c6d7f7308284ba6a1059dc49e14dad6647e1d44a338",
+    "NOTICE.md": "02e4bf9ebd5cd19d726e8158659b60caf2c0e5077a2d330d41e506f50570f3b1",
+    "README.md": "d41a9abcd7c2e09b0d224d658b02d80672b156867c7432c02345309e776c150b",
+    "src/lib.rs": "4079d6a17a61003a19801b1c0071d4b2800f936552641da6e9602e1558e0026b",
+    "src/unicast.rs": "05abc1674a1fb2d496e457ec5e07cc8f5c8a14da35086d5743e084c003993fda",
+    "src/utils.rs": "5c4df836c7a3d95394397bba9c7b6e9af5e79594556a3fda55cb5fc688977876"
+  },
+  "license_source_commit": "1211779c3647f5a96713dade452c546a07823580",
+  "original_files": {
+    ".cargo_vcs_info.json": "7af90d5f1ced67374caa9a9bd8816ce81444598775990fed1140fcddfc0afec6",
+    "Cargo.lock": "f5a97d9f85fa3a856b223ce96483e7d256771cb2c1f9c6c71e40414efb2afc88",
+    "Cargo.toml": "a5b4dbedecdab5c236a0939e57d627a0e1a96269e589e87c66f8868c72095c12",
+    "Cargo.toml.orig": "23d7cabb6f7ee09d605478d9877a1a839125d789c56910526161e1bd4b714503",
+    "README.md": "d41a9abcd7c2e09b0d224d658b02d80672b156867c7432c02345309e776c150b",
+    "src/lib.rs": "3e4a9bed390785420474a8b62132760f2d69ee049f0753ae70976443b3349270",
+    "src/unicast.rs": "9dbd394374f5925dbf67192b54805a5e7ba70dda242b5f900011222f4f7616b4",
+    "src/utils.rs": "c316da4c339d0609c1b1d2dcbec5d24dc0d60fd211abf4848ea3e448794d5b1b"
+  },
+  "repository": "https://github.com/eclipse-zenoh/zenoh",
+  "selected_license": "Apache-2.0",
+  "source_patch": {
+    "path": "upstream/patches/zenoh-link-tls-1.10.1-private-roots.patch",
+    "sha256": "c43e85b784208adbeb68713b4617ce8e9af6302ecd0ceba39239a39a1171dc38"
+  },
+  "upstream_commit": "1211779c3647f5a96713dade452c546a07823580",
+  "upstream_license": "EPL-2.0 OR Apache-2.0",
+  "version": "1.10.1"
+}

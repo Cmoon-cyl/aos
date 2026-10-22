@@ -1,0 +1,365 @@
+{
+  "name": "aos_observation/msg/RequestTelemetryV1",
+  "kind": "msg",
+  "message": {
+    "type": "object",
+    "properties": {
+      "schema_version": {
+        "type": "integer",
+        "const": 1
+      },
+      "stream_id": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}$",
+        "maxLength": 32
+      },
+      "batch_sequence": {
+        "type": "integer",
+        "minimum": 1,
+        "exclusiveMaximum": 18446744073709551616
+      },
+      "source_context_id": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
+        "maxLength": 36
+      },
+      "source_process_id": {
+        "type": "integer",
+        "minimum": 0,
+        "maximum": 4294967295
+      },
+      "source_before": {
+        "type": "object",
+        "properties": {
+          "events_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "rejected_events_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "metric_keys_dropped_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_dropped_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_write_failures_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_capacity": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_queued": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_capture_enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "events_total",
+          "rejected_events_total",
+          "metric_keys_dropped_total",
+          "log_dropped_total",
+          "log_write_failures_total",
+          "log_capacity",
+          "log_queued",
+          "log_capture_enabled"
+        ],
+        "additionalProperties": false
+      },
+      "source_after": {
+        "type": "object",
+        "properties": {
+          "events_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "rejected_events_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "metric_keys_dropped_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_dropped_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_write_failures_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_capacity": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_queued": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "log_capture_enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "events_total",
+          "rejected_events_total",
+          "metric_keys_dropped_total",
+          "log_dropped_total",
+          "log_write_failures_total",
+          "log_capacity",
+          "log_queued",
+          "log_capture_enabled"
+        ],
+        "additionalProperties": false
+      },
+      "statistics": {
+        "type": "object",
+        "properties": {
+          "drained_records_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "filtered_records_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "invalid_records_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "queue_dropped_records_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "queue_dropped_bytes_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "oversized_records_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "publish_attempts_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "publish_submitted_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "publish_errors_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "publish_failed_records_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "source_errors_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          },
+          "export_capture_errors_total": {
+            "type": "integer",
+            "minimum": 0,
+            "exclusiveMaximum": 18446744073709551616
+          }
+        },
+        "required": [
+          "drained_records_total",
+          "filtered_records_total",
+          "invalid_records_total",
+          "queue_dropped_records_total",
+          "queue_dropped_bytes_total",
+          "oversized_records_total",
+          "publish_attempts_total",
+          "publish_submitted_total",
+          "publish_errors_total",
+          "publish_failed_records_total",
+          "source_errors_total",
+          "export_capture_errors_total"
+        ],
+        "additionalProperties": false
+      },
+      "records": {
+        "type": "array",
+        "maxItems": 32,
+        "items": {
+          "type": "object",
+          "properties": {
+            "schema_version": {
+              "type": "integer",
+              "const": 1
+            },
+            "process_id": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967295
+            },
+            "context_id": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$",
+              "maxLength": 36
+            },
+            "sequence": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMaximum": 18446744073709551616
+            },
+            "system_time_unix_ns": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[0-9]+$",
+              "maxLength": 39
+            },
+            "steady_time_ns": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMaximum": 18446744073709551616
+            },
+            "identity_trust": {
+              "type": "string",
+              "const": "unauthenticated"
+            },
+            "component": {
+              "type": "string",
+              "enum": [
+                "service",
+                "action"
+              ]
+            },
+            "event": {
+              "type": "string",
+              "pattern": "^[a-z0-9_.]+$",
+              "maxLength": 64
+            },
+            "outcome": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "rejected",
+                "inactive",
+                "closed",
+                "timeout",
+                "invalid_argument",
+                "resource_limit",
+                "validation",
+                "unsupported",
+                "remote",
+                "queue_overflow",
+                "no_response",
+                "transport"
+              ]
+            },
+            "node_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_:.\\-]+$",
+              "maxLength": 128
+            },
+            "request_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_:.\\-]+$",
+              "maxLength": 128
+            },
+            "goal_id": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_:.\\-]+$",
+              "maxLength": 128
+            },
+            "endpoint": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^[^\\p{Cc}]+$"
+            },
+            "correlation_source": {
+              "type": "string",
+              "enum": [
+                "outgoing_attachment",
+                "incoming_attachment",
+                "reply_attachment",
+                "query_context",
+                "missing_attachment",
+                "invalid_attachment",
+                "mismatched_attachment"
+              ]
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMaximum": 18446744073709551616
+            },
+            "duration_ns": {
+              "type": "integer",
+              "minimum": 0,
+              "exclusiveMaximum": 18446744073709551616
+            }
+          },
+          "required": [
+            "schema_version",
+            "process_id",
+            "context_id",
+            "sequence",
+            "system_time_unix_ns",
+            "steady_time_ns",
+            "identity_trust",
+            "component",
+            "event",
+            "outcome"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "required": [
+      "schema_version",
+      "stream_id",
+      "batch_sequence",
+      "source_context_id",
+      "source_process_id",
+      "source_before",
+      "source_after",
+      "statistics",
+      "records"
+    ],
+    "additionalProperties": false,
+    "description": "Bounded original Core Service/Action metadata. Source snapshots straddle a non-atomic drain. Statistics precede this batch submission; submitted is not delivered. Identity remains unauthenticated. No business payload or command."
+  }
+}

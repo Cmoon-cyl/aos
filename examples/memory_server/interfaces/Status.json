@@ -1,0 +1,59 @@
+{
+  "name": "aos_memory/msg/Status",
+  "kind": "msg",
+  "message": {
+    "type": "object",
+    "properties": {
+      "instance_id": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{32}$",
+        "description": "Changes on process restart; not an authentication claim."
+      },
+      "sequence": {
+        "type": "integer",
+        "minimum": 1
+      },
+      "lifecycle": {
+        "type": "string",
+        "maxLength": 32
+      },
+      "commit_seq": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "records": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "total_bytes": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "requests": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "active_exports": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "audit_errors": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "required": [
+      "instance_id",
+      "sequence",
+      "lifecycle",
+      "commit_seq",
+      "records",
+      "total_bytes",
+      "requests",
+      "active_exports",
+      "audit_errors"
+    ],
+    "additionalProperties": false,
+    "description": "Published every second while active, including when no consumer exists. Contains counters, never note text. Inactive periods are not replayed."
+  }
+}

@@ -1,0 +1,23 @@
+[package]
+name = "aos-bag"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+aos-core.workspace = true
+mcap.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+aos-zenoh.workspace = true
+zenoh.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

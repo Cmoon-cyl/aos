@@ -1,0 +1,138 @@
+{
+  "name": "aos_memory/action/Export",
+  "kind": "action",
+  "goal": {
+    "type": "object",
+    "properties": {
+      "prefix": {
+        "type": "string",
+        "maxLength": 128,
+        "pattern": "^$|^[A-Za-z0-9][A-Za-z0-9_./:-]*$",
+        "default": ""
+      },
+      "max_records": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100000,
+        "default": 10000,
+        "description": "Hard upper bound on selected snapshot rows; exceeding it aborts without publishing a file."
+      }
+    },
+    "required": [],
+    "additionalProperties": false,
+    "description": "Create one bounded JSONL snapshot under the provider work directory. Each goal is an independent export; no cross-goal replay or resume.",
+    "examples": [
+      {
+        "prefix": "synthetic/",
+        "max_records": 10000
+      }
+    ]
+  },
+  "result": {
+    "type": "object",
+    "properties": {
+      "ok": {
+        "type": "boolean"
+      },
+      "code": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 64
+      },
+      "message": {
+        "type": "string",
+        "maxLength": 256
+      },
+      "data": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "file": {
+                "type": "string",
+                "pattern": "^exports/[0-9a-f]{32}\\.jsonl$",
+                "description": "Relative to the provider work directory. This endpoint does not transfer the file to the caller."
+              },
+              "records": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "description": "SHA-256 of the exact UTF-8 text or JSONL file bytes, as specified by this endpoint."
+              },
+              "snapshot_seq": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "instance_id": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}$"
+              }
+            },
+            "required": [
+              "file",
+              "records",
+              "bytes",
+              "sha256",
+              "snapshot_seq",
+              "instance_id"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "description": "Successful business value, or null for a named business error. Transport errors and timeouts are separate."
+      }
+    },
+    "required": [
+      "ok",
+      "code",
+      "message",
+      "data"
+    ],
+    "additionalProperties": false,
+    "default": {
+      "ok": false,
+      "code": "NOT_EXECUTED",
+      "message": "No completed export result.",
+      "data": null
+    }
+  },
+  "feedback": {
+    "type": "object",
+    "properties": {
+      "records_written": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "total_records": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "bytes_written": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "snapshot_seq": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "required": [
+      "records_written",
+      "total_records",
+      "bytes_written",
+      "snapshot_seq"
+    ],
+    "additionalProperties": false,
+    "description": "Progress after writing each real batch; it does not imply final publication."
+  }
+}

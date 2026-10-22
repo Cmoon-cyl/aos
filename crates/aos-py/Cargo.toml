@@ -1,0 +1,22 @@
+[package]
+name = "aos-py"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "_native"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+aos-core.workspace = true
+aos-zenoh.workspace = true
+aos-launch.workspace = true
+aos-bag.workspace = true
+pyo3.workspace = true
+zenoh.workspace = true
+serde_json.workspace = true
+serde.workspace = true

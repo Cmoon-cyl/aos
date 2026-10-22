@@ -1,0 +1,352 @@
+{
+  "schema_version": 1,
+  "domain_id": 29,
+  "subjects": [
+    {
+      "id": "provider",
+      "common_name": "provider",
+      "nodes": [
+        {
+          "name": "provider",
+          "namespace": "/secure"
+        },
+        {
+          "name": "observer",
+          "namespace": "/secure"
+        }
+      ],
+      "endpoints": [
+        {
+          "node": {
+            "name": "provider",
+            "namespace": "/secure"
+          },
+          "namespace": "/secure",
+          "name": "/secure/allowed",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "publish"
+          ]
+        },
+        {
+          "node": {
+            "name": "provider",
+            "namespace": "/secure"
+          },
+          "namespace": "/secure",
+          "name": "/secure/denied",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "publish"
+          ]
+        },
+        {
+          "node": {
+            "name": "provider",
+            "namespace": "/secure"
+          },
+          "namespace": "/replay",
+          "name": "/replay/allowed",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "publish"
+          ]
+        },
+        {
+          "node": {
+            "name": "provider",
+            "namespace": "/secure"
+          },
+          "namespace": "/replay",
+          "name": "/replay/denied",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "publish"
+          ]
+        },
+        {
+          "node": {
+            "name": "observer",
+            "namespace": "/secure"
+          },
+          "namespace": "/secure",
+          "name": "/secure/denied",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "subscribe"
+          ]
+        },
+        {
+          "node": {
+            "name": "observer",
+            "namespace": "/secure"
+          },
+          "namespace": "/replay",
+          "name": "/replay/allowed",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "subscribe"
+          ]
+        },
+        {
+          "node": {
+            "name": "observer",
+            "namespace": "/secure"
+          },
+          "namespace": "/replay",
+          "name": "/replay/denied",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "subscribe"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operator",
+      "common_name": "operator",
+      "nodes": [
+        {
+          "name": "operator",
+          "namespace": "/secure"
+        }
+      ],
+      "graph_nodes": [
+        {
+          "name": "provider",
+          "namespace": "/secure"
+        }
+      ],
+      "systems": [
+        {
+          "node": {
+            "name": "operator",
+            "namespace": "/secure"
+          },
+          "target": {
+            "name": "provider",
+            "namespace": "/secure"
+          },
+          "operations": [
+            "describe"
+          ]
+        }
+      ],
+      "endpoints": [
+        {
+          "node": {
+            "name": "operator",
+            "namespace": "/secure"
+          },
+          "namespace": "/secure",
+          "name": "/secure/allowed",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "subscribe"
+          ]
+        },
+        {
+          "node": {
+            "name": "operator",
+            "namespace": "/secure"
+          },
+          "namespace": "/replay",
+          "name": "/replay/allowed",
+          "interface": {
+            "name": "aos_examples/msg/String",
+            "kind": "msg",
+            "message": {
+              "type": "object",
+              "properties": {
+                "data": {
+                  "type": "string",
+                  "description": "Text carried by this message."
+                }
+              },
+              "required": [
+                "data"
+              ],
+              "additionalProperties": false,
+              "examples": [
+                {
+                  "data": "hello AOS"
+                }
+              ]
+            }
+          },
+          "operations": [
+            "publish"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+[package]
+name = "aos-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "aos"
+path = "src/main.rs"
+
+[dependencies]
+aos-core.workspace = true
+aos-zenoh.workspace = true
+aos-launch.workspace = true
+aos-bag.workspace = true
+zenoh.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+jsonschema.workspace = true
+uuid.workspace = true
+ctrlc = "3.5"
+libc = "=0.2.191"

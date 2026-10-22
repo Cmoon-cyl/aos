@@ -1,0 +1,13 @@
+{
+  "name": "aos_examples/msg/String",
+  "kind": "msg",
+  "message": {
+    "type": "object",
+    "properties": {
+      "data": {"type": "string", "description": "Text carried by this message."}
+    },
+    "required": ["data"],
+    "additionalProperties": false,
+    "examples": [{"data": "hello AOS"}]
+  }
+}
