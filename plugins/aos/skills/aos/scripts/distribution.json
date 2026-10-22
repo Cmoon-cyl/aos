@@ -1,24 +1,24 @@
 {
   "schema_version": 1,
-  "manager_version": "0.1.1",
+  "manager_version": "0.1.2",
   "repository": "Cmoon-cyl/aos",
   "release_prefix": "aos-agent-v",
-  "runtime_version": "0.2.0",
-  "runtime_tag": "v0.2.0",
+  "runtime_version": "0.2.1",
+  "runtime_tag": "v0.2.1",
   "python": "3.11.15",
   "uv_version": "0.13.5",
   "platforms": {
     "macos-arm64": {
-      "asset": "aos-0.2.0-macos-arm64-728869949fbd.tar.gz",
-      "sha256": "36b7377756c13e49e49752fc9b8d58c09c27da6e950f4619060231fe183263b7"
+      "asset": "aos-0.2.1-macos-arm64-d1f1037b920b.tar.gz",
+      "sha256": "9bd50d854f5f2e616cc486377dfb5cd77cafaa5c2c3fe90877f41e8af1668f20"
     },
     "linux-x86_64": {
-      "asset": "aos-0.2.0-linux-x86_64-728869949fbd.tar.gz",
-      "sha256": "0b11ea8757469a037a7c0c2f0d8668b29e64a1537a2cac3520b5ed2a2e7c77a6"
+      "asset": "aos-0.2.1-linux-x86_64-d1f1037b920b.tar.gz",
+      "sha256": "2bedb2c79e013eab6d5acaf124fda73c856289e7b94a16cd0a9f6e49a6e0b619"
     },
     "windows-x86_64": {
-      "asset": "aos-0.2.0-windows-x86_64-728869949fbd.zip",
-      "sha256": "453b6bd04f52cc59b07551d568faab9474d1f828f479dbb7a8d9c8b920268c7c"
+      "asset": "aos-0.2.1-windows-x86_64-d1f1037b920b.zip",
+      "sha256": "4a52736b5d0333777ca119f31ebd1787109a9e1f00d11110de303633e7a31ba0"
     }
   }
 }

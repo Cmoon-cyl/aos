@@ -112,7 +112,7 @@ aos update rollback
 `aos update apply --request 文件路径`：
 
 ```json
-{"version":"0.1.1"}
+{"version":"0.1.2"}
 ```
 
 相同版本无需更新；降级使用 `update rollback`，切回上一个通过重新验证的安装。

@@ -1,22 +1,22 @@
 {
   "schema_version": 1,
-  "manager_version": "0.1.1",
-  "runtime_version": "0.2.0",
+  "manager_version": "0.1.2",
+  "runtime_version": "0.2.1",
   "assets": [
     {
-      "name": "aos-agent-0.1.1.tar.gz",
-      "digest": "sha256:b045760ba9eb312d40093a20a5440ad435167a8e8504d90784cab6ff932231ad",
-      "size": 25759
+      "name": "aos-agent-0.1.2.tar.gz",
+      "digest": "sha256:5724fb6e8a55e44a42dd0aaf0df96394f29faf5bafed6a50e2503d92005a1135",
+      "size": 28875
     },
     {
-      "name": "aos-agent-0.1.1.zip",
-      "digest": "sha256:059c82796a54b2cd9dd8992e843e751995651874facfe438a9000d475ee4be77",
-      "size": 29995
+      "name": "aos-agent-0.1.2.zip",
+      "digest": "sha256:466775b13be324cdcd9c066b55cc9d4ec599c645127644f165c84e25158cd648",
+      "size": 33704
     },
     {
       "name": "aos.plugin",
-      "digest": "sha256:5c6db52d61e4b57eecd2fae1c46778eeca76b6254211d2089c2e08f8f73494ed",
-      "size": 29715
+      "digest": "sha256:356b0ad18d1dfcb47766975249583f44e74e2ad2e4c8238a8914ba6ce7966c49",
+      "size": 33404
     }
   ]
 }

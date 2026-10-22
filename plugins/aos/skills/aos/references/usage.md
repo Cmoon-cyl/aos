@@ -52,7 +52,7 @@ aos-agent-vX.Y.Z distribution. Its version is the agent/CLI manager distribution
 each distribution pins an accepted native runtime. --version reports both.
 
 To select a particular available manager version, write
-{"version":"0.1.1"} to a file and pass it with --request. Applying the installed
+{"version":"0.1.2"} to a file and pass it with --request. Applying the installed
 version is a no-op. Downgrading uses rollback to the previous verified installation.
 An update verifies the archive, installs to a separate directory, runs a real
 Service call, then atomically replaces current.json. Failed candidates do not

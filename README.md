@@ -127,7 +127,7 @@ flowchart LR
 | [快速开始](docs/getting-started.md) | [CLI 与 JSON 输入输出](docs/cli.md) | [mTLS 与 ACL](docs/platform/security-cli.md) |
 | [核心概念](docs/concepts.md) | [MemoryServer 完整应用](docs/platform/memory-server.md) | [故障排查](docs/troubleshooting.md) |
 | [示例选择](docs/examples.md) | [参数与生命周期](docs/platform/managed-cli.md) | [支持范围与限制](docs/support.md) |
-| [0.2.0 发行说明](docs/releases/v0.2.0.md) | [进程启动与依赖](docs/platform/process-cli.md) | [源码构建与发行](docs/development.md) |
+| [0.2.1 发行说明](docs/releases/v0.2.1.md) | [进程启动与依赖](docs/platform/process-cli.md) | [源码构建与发行](docs/development.md) |
 
 ## 先理解这些行为
 

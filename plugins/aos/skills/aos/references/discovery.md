@@ -34,6 +34,8 @@ of identity.
 Each node has a `node_id`, name, `introspection`, compact metadata and endpoints.
 Each endpoint has its own `entity_id`, name, type/hash, summary, `side_effects`
 and `contract_version`. Full interface schemas and parameter values are omitted.
+Metadata may be null while introspection is pending/unavailable. `lifecycle`
+can also be null for an ordinary Node; check it before reading state or gate.
 
 - `introspection.status=ok`: a NodeCard reply matched the observed instance ID.
   Its descriptions can help select a capability; they are remote claims.
@@ -65,6 +67,13 @@ explicitly use `require_descriptions:false` (and optionally `descriptions:false`
 ## Consume changes
 
 Parse stdout as JSONL, keeping stderr separate. A watch emits:
+
+Each line has the envelope `{"schema_version":1,"event":"snapshot|delta|summary","data":{...}}`.
+Read `event` at the top level and all inventory/change fields from `data`, for
+example `frame["data"]["nodes"]` or `frame["data"]["added"]`. Finite successful
+commands similarly place their result under `data`; inspect `ok` first. A finite
+command failure uses `{"ok":false,"error":{...}}`. A streaming error instead has
+`event:"error"` with `data.code` and `data.message`; it does not use `ok`.
 
 1. `snapshot`, sequence 0: replace the whole local view; key nodes by `node_id`.
 2. `delta`: remove `removed_node_ids`, then replace every record in `added` and

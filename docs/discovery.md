@@ -84,6 +84,12 @@ aos graph watch --request watch.json
 
 输出 JSONL，stdout 与 stderr 要分别读取：
 
+每行外层是 `{"schema_version":1,"event":"事件名","data":{...}}`。
+读取顶层 `event` 区分事件，节点与增量字段在 `data` 中，例如
+`frame["data"]["nodes"]`、`frame["data"]["added"]`。普通命令成功结果也在
+`data` 中，先检查 `ok`；普通命令失败返回 `{"ok":false,"error":{...}}`。
+流式错误仍使用 `event:"error"` 与 `data.code`、`data.message`，不使用 `ok`。
+
 1. `snapshot` 是完整初始视图，`sequence=0`。此时有些 NodeCard 仍为 `pending`。
 2. `delta` 包含 `added`、`updated` 和 `removed_node_ids`。按 `node_id` 删除或替换完整记录。
 3. `summary` 表示本地观察结束；失败时还会输出 `error`，应同时检查退出码。
