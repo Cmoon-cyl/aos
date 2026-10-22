@@ -637,6 +637,11 @@ pub fn describe(group: &str, verb: &str) -> Option<Value> {
     });
     if group == "graph" {
         description["discovery"] = crate::graph_commands::contract();
+        description["exit_codes"]["2"] =
+            json!("invalid request or explicit resource limit; narrow the view");
+        description["exit_codes"]["129"] = json!("SIGHUP after local observation cleanup");
+        description["exit_codes"]["131"] = json!("SIGQUIT after local observation cleanup");
+        description["exit_codes"]["143"] = json!("SIGTERM after local observation cleanup");
         description["defaults"] = json!({"timeout_seconds":if verb == "snapshot" {5} else {30},
             "settle_time_seconds":0.5,"probe_timeout_seconds":0.5,"refresh_interval_seconds":5});
     }

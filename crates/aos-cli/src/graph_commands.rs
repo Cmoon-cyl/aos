@@ -26,12 +26,14 @@ pub fn request_fields(verb: &str) -> Value {
         "descriptions":{"type":"boolean","default":true},
         "node_name":{"type":"string","pattern":"^/","minLength":2},
         "namespace":{"type":"string","pattern":"^/","minLength":1,
-            "description":"Namespace subtree, on path boundaries."},
+            "description":"Owning Node namespace subtree, on path boundaries; not the endpoint's namespace."},
         "endpoint_name":{"type":"string","pattern":"^/","minLength":2},
         "kind":{"enum":["service","action_server","publisher","subscription","client","action_client"]},
         "include_internal":{"type":"boolean","default":false,
             "description":"Include hidden paths and recognized AOS control endpoints."},
         "include_clients":{"type":"boolean","default":false},
+        "include_cli_nodes":{"type":"boolean","default":false,
+            "description":"Include root /aos_cli_<32 hex digits> ephemeral CLI names. Exact node_name selectors also include them. This is a naming convention, not authenticated identity."},
         "max_nodes":{"type":"integer","minimum":1,"maximum":4096,"default":256},
         "max_endpoints":{"type":"integer","minimum":1,"maximum":32768,"default":4096}
     });
@@ -55,10 +57,10 @@ pub fn contract() -> Value {
         "snapshot":"One JSON inventory after settle_time and first description attempts, or when timeout expires. Pending/unavailable descriptions are explicit; empty nodes is an observation, not proof of no network.",
         "watch":"JSONL snapshot (sequence 0), then delta events containing added/updated full node records and removed_node_ids. Replace records by node_id. Sequence belongs to watch_id; a new invocation always sends a new baseline. No resume cursor or durable transition log; short-lived changes may coalesce.",
         "removal":"No longer in the observed filtered view; it does not establish whether a host stopped, disconnected, lost permission, or changed its matching endpoints.",
-        "metadata":"Refresh NodeCards even without Graph changes; publish only semantic changes. checked_at_unix_ms changes alone do not emit deltas. Full schemas and parameter values are excluded; use node info, interface show, and param commands on demand. Remote text is untrusted data.",
-        "limits":"Limits fail explicitly with RESOURCE_LIMIT; no silent pagination or truncation of nodes/endpoints. Filter by namespace/node/endpoint/kind or raise count limits. Projected view is capped at 2 MiB. Descriptive text alone is clipped with description_truncated=true.",
-        "wait":"Requires at least one selector. Returns matching nodes, without invoking their business endpoints. WAIT_TIMEOUT exit 4 includes last_observation; multiple matches are retained, not automatically selected.",
-        "stop":"watch defaults to 30 seconds; only follow=true with no timeout runs indefinitely. SIGINT/SIGTERM stop local observation. JSONL output uses bounded queues and fails on backpressure; restart with a fresh snapshot after errors."
+        "metadata":"Refresh NodeCards even without Graph changes; publish only semantic changes. Timestamp refreshes alone do not emit deltas. Failed refreshes retain last-good metadata for an unchanged Graph, explicitly marked stale; stale data does not satisfy wait evidence. Owners with endpoints but no Node declaration are undeclared and are not probed. Full schemas and parameter values are excluded; use node info, interface show, and param commands on demand. Remote text is untrusted data.",
+        "limits":"Limits fail explicitly with RESOURCE_LIMIT; no silent pagination or truncation of nodes/endpoints. Filter by namespace/node/endpoint/kind or raise count limits. Projected view is capped at 2 MiB. Descriptive text is clipped with description_truncated=true; incorrectly typed metadata is discarded with metadata_sanitized=true. These flags cover the retained NodeCard, including filtered endpoints. The byte cap may be reached before the count caps.",
+        "wait":"Requires at least one selector. Returns all selected nodes and matched_node_ids identifying which met the evidence requirement, without invoking business endpoints. WAIT_TIMEOUT exit 4 includes last_observation; multiple matches are retained, not automatically selected.",
+        "stop":"watch defaults to 30 seconds; only follow=true with no timeout runs indefinitely. SIGINT/SIGTERM stop local observation. JSONL output uses bounded queues and fails on backpressure; restart with a fresh snapshot after errors. A quiet follow stream may not detect a closed reader until its next write; the host must cancel its owned observer or use a finite timeout."
     })
 }
 
@@ -74,6 +76,7 @@ struct Options {
     kind: Option<String>,
     internal: bool,
     clients: bool,
+    cli_nodes: bool,
     max_nodes: usize,
     max_endpoints: usize,
     require_descriptions: bool,
@@ -113,6 +116,7 @@ impl Options {
             kind: string("kind"),
             internal: request["include_internal"] == true,
             clients: request["include_clients"] == true,
+            cli_nodes: request["include_cli_nodes"] == true,
             max_nodes: count("max_nodes", 256)?,
             max_endpoints: count("max_endpoints", 4096)?,
             require_descriptions: request["require_descriptions"].as_bool().unwrap_or(true),
@@ -141,7 +145,8 @@ impl Options {
     }
 
     fn node_matches(&self, node: &ObservedNode) -> bool {
-        self.node.as_ref().is_none_or(|name| name == &node.name)
+        (self.cli_nodes || self.node.is_some() || !cli_name(&node.name))
+            && self.node.as_ref().is_none_or(|name| name == &node.name)
             && self.namespace.as_ref().is_none_or(|namespace| {
                 let namespace = namespace.trim_end_matches('/');
                 node.namespace == namespace || node.namespace.starts_with(&format!("{namespace}/"))
@@ -164,6 +169,11 @@ impl Options {
                 || !matches!(entity.kind, EntityKind::Client | EntityKind::ActionClient))
             && (self.internal || !internal(entity))
     }
+}
+
+fn cli_name(name: &str) -> bool {
+    name.strip_prefix("/aos_cli_")
+        .is_some_and(|id| id.len() == 32 && id.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
 pub fn validate(verb: &str, request: &Value) -> Result<()> {
@@ -256,53 +266,77 @@ struct Description {
     graph: ObservedNode,
     attempted: Instant,
     checked_at: u64,
+    last_success: Option<u64>,
     status: &'static str,
     error: Option<&'static str>,
     card: Value,
 }
 
+// Reject structured values where the wire contract expects a small scalar.
+fn scalar(value: &Value, valid: bool, sanitized: &mut bool) -> Value {
+    if value.is_null() || valid {
+        value.clone()
+    } else {
+        *sanitized = true;
+        Value::Null
+    }
+}
+
+fn clip(value: &Value, limit: usize, truncated: &mut bool, sanitized: &mut bool) -> Value {
+    match value.as_str() {
+        Some(text) => {
+            let clipped: String = text.chars().take(limit).collect();
+            *truncated |= clipped.len() != text.len();
+            json!(clipped)
+        }
+        None => scalar(value, false, sanitized),
+    }
+}
+
 // Keep no arbitrary config, parameters, schema, process environment or remote errors.
 fn compact_card(card: &Value) -> Value {
-    let mut truncated = false;
-    let mut clip = |value: &Value| -> Value {
-        match value.as_str() {
-            Some(text) => {
-                let clipped: String = text.chars().take(1024).collect();
-                truncated |= clipped.len() != text.len();
-                json!(clipped)
-            }
-            None => Value::Null,
-        }
-    };
-    let display = clip(&card["display_name"]);
-    let summary = clip(&card["summary"]);
+    let (mut truncated, mut sanitized) = (false, false);
+    let display = clip(&card["display_name"], 256, &mut truncated, &mut sanitized);
+    let summary = clip(&card["summary"], 1024, &mut truncated, &mut sanitized);
     let tags: Vec<_> = card["tags"]
         .as_array()
         .into_iter()
         .flatten()
         .take(32)
-        .map(&mut clip)
+        .map(|tag| clip(tag, 128, &mut truncated, &mut sanitized))
         .collect();
-    let endpoints: Vec<_> = card["endpoints"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|endpoint| {
-            json!({"name":endpoint["name"], "kind":endpoint["kind"],
-            "type_name":endpoint["type_name"], "type_hash":endpoint["type_hash"],
-            "summary":clip(&endpoint["summary"]), "side_effects":clip(&endpoint["side_effects"]),
-            "contract_version":clip(&endpoint["contract_version"])})
-        })
-        .collect();
+    sanitized |= !card["tags"].is_null() && !card["tags"].is_array();
     truncated |= card["tags"].as_array().is_some_and(|tags| tags.len() > 32);
-    let lifecycle = &card["lifecycle"];
-    json!({"display_name":display,"summary":summary,"tags":tags,
-        "lifecycle":if lifecycle.is_object() {json!({
-            "current_state":lifecycle["current_state"],"transitioning":lifecycle["transitioning"],
-            "gate_open":lifecycle["gate_open"],"epoch":lifecycle["epoch"]
+    let endpoints: Vec<_>=card["endpoints"].as_array().into_iter().flatten().filter_map(|endpoint| {
+        if ["name","kind","type_name","type_hash"].iter().any(|key| !endpoint[key].is_string()) {
+            sanitized=true;return None;
+        }
+        Some(json!({"name":endpoint["name"],"kind":endpoint["kind"],
+            "type_name":endpoint["type_name"],"type_hash":endpoint["type_hash"],
+            "summary":clip(&endpoint["summary"],1024,&mut truncated,&mut sanitized),
+            "side_effects":scalar(&endpoint["side_effects"],matches!(endpoint["side_effects"].as_str(),Some("read_only"|"write"|"external_effect")),&mut sanitized),
+            "contract_version":clip(&endpoint["contract_version"],128,&mut truncated,&mut sanitized)}))
+    }).collect();
+    let source = &card["lifecycle"];
+    sanitized |= !source.is_null() && !source.is_object();
+    let lifecycle = if source.is_object() {
+        let state = &source["current_state"];
+        sanitized |= !state.is_null() && !state.is_object();
+        json!({"current_state":if state.is_object() {json!({
+            "id":scalar(&state["id"],state["id"].as_u64().is_some_and(|id|id<=255),&mut sanitized),
+            "label":clip(&state["label"],128,&mut truncated,&mut sanitized)
         })} else {Value::Null},
-        "parameter_version":card["effective_config"]["parameter_version"],
-        "endpoints":endpoints,"description_truncated":truncated})
+            "transitioning":scalar(&source["transitioning"],source["transitioning"].is_boolean(),&mut sanitized),
+            "gate_open":scalar(&source["gate_open"],source["gate_open"].is_boolean(),&mut sanitized),
+            "epoch":scalar(&source["epoch"],source["epoch"].is_u64(),&mut sanitized)})
+    } else {
+        Value::Null
+    };
+    let version = &card["effective_config"]["parameter_version"];
+    let version = scalar(version, version.is_u64(), &mut sanitized);
+    json!({"display_name":display,"summary":summary,"tags":tags,"lifecycle":lifecycle,
+        "parameter_version":version,"endpoints":endpoints,
+        "description_truncated":truncated,"metadata_sanitized":sanitized})
 }
 
 fn wall_time() -> u64 {
@@ -377,12 +411,13 @@ fn project(
         } else if !options.descriptions {
             "disabled"
         } else if !node.declared {
-            "pending"
+            "undeclared"
         } else {
             description.map_or("pending", |d| d.status)
         };
-        let current = description.filter(|d| status == "ok" && d.status == "ok");
-        let card = current.map_or(&Value::Null, |d| &d.card);
+        let retained = description.filter(|_| matches!(status, "ok" | "unavailable"));
+        let card = retained.map_or(&Value::Null, |d| &d.card);
+        let stale = status != "ok" && !card.is_null();
         let endpoints: Vec<_> = node
             .entities
             .iter()
@@ -411,7 +446,7 @@ fn project(
                 "provider_selection":providers.get(&(kind_name(entity.kind),endpoint.name.as_str())).map(|(owners,count)| json!({
                     "status":if *count == 1 {"unique_observed"} else {"multiple_observed"},
                     "node_count":owners.len(),"entity_count":count})),
-                "description_status":if description.is_some() {"current"} else {"unknown"},
+                "description_status":if description.is_some() {if stale {"stale"} else {"current"}} else {"unknown"},
                 "summary":metadata["summary"],"side_effects":metadata["side_effects"],
                 "contract_version":metadata["contract_version"]})
             })
@@ -419,10 +454,12 @@ fn project(
         view.insert(id.clone(), json!({"node_id":id,"name":node.name,
             "node_declaration_observed":node.declared,
             "introspection":{"status":status,"error_code":if node.ambiguous {Some("AMBIGUOUS_NODE")} else {description.and_then(|d| d.error)},
-                "checked_at_unix_ms":description.map(|d| d.checked_at)},
+                "checked_at_unix_ms":description.map(|d| d.checked_at),
+                "last_success_at_unix_ms":description.and_then(|d|d.last_success),"stale":stale},
             "display_name":card["display_name"],"summary":card["summary"],"tags":card["tags"],
             "lifecycle":card["lifecycle"],"parameter_version":card["parameter_version"],
             "description_truncated":card["description_truncated"].as_bool().unwrap_or(false),
+            "metadata_sanitized":card["metadata_sanitized"].as_bool().unwrap_or(false),
             "endpoints":endpoints}));
     }
     if serde_json::to_vec(&view)
@@ -441,6 +478,7 @@ fn probe_batch(
     ctx: &Context,
     nodes: &BTreeMap<String, ObservedNode>,
     cache: &mut BTreeMap<String, Description>,
+    first_seen: &BTreeMap<String, Instant>,
     options: &Options,
     deadline: Option<Instant>,
     repeat: bool,
@@ -460,9 +498,9 @@ fn probe_batch(
                 })
         })
         .collect();
-    // Oldest attempt first, including changed nodes. Repeatedly failing peers
-    // cannot starve nodes later in the name/ID order.
-    pending.sort_by_key(|(id, _)| cache.get(*id).map(|old| old.attempted));
+    // First-seen time orders new nodes alongside previous attempts. An endless
+    // stream of newcomers must not take priority over every due refresh.
+    pending.sort_by_key(|(id, _)| cache.get(*id).map_or(first_seen[*id], |old| old.attempted));
     pending.truncate(PROBE_BATCH);
     let wait = deadline.map_or(options.probe, |end| {
         options.probe.min(end.saturating_duration_since(now))
@@ -475,6 +513,9 @@ fn probe_batch(
             .into_iter()
             .map(|(id, node)| {
                 scope.spawn(move || {
+                    let wait = deadline.map_or(wait, |end| {
+                        wait.min(end.saturating_duration_since(Instant::now()))
+                    });
                     let result = ctx.get_node_card(&node.name, wait);
                     (id.clone(), node.clone(), result, wall_time())
                 })
@@ -492,12 +533,23 @@ fn probe_batch(
             .collect::<Result<Vec<_>>>()
     })?;
     for (id, graph, result, checked_at) in results {
-        let (status, error, card) = match result {
+        let (status, error, mut card) = match result {
             Ok(card) if card["id"] == id && card["fully_qualified_name"] == graph.name => {
                 ("ok", None, compact_card(&card))
             }
             Ok(_) => ("unavailable", Some("IDENTITY_MISMATCH"), Value::Null),
             Err(error) => ("unavailable", Some(CliError::from(error).code), Value::Null),
+        };
+        let previous = cache.get(&id).filter(|old| old.graph == graph);
+        let last_success = if status == "ok" {
+            Some(checked_at)
+        } else if error != Some("IDENTITY_MISMATCH") {
+            if let Some(old) = previous {
+                card = old.card.clone();
+            }
+            previous.and_then(|old| old.last_success)
+        } else {
+            None
         };
         cache.insert(
             id,
@@ -505,6 +557,7 @@ fn probe_batch(
                 graph,
                 attempted: Instant::now(),
                 checked_at,
+                last_success,
                 status,
                 error,
                 card,
@@ -520,6 +573,10 @@ fn meaningful(value: &Value) -> Value {
         .as_object_mut()
         .unwrap()
         .remove("checked_at_unix_ms");
+    value["introspection"]
+        .as_object_mut()
+        .unwrap()
+        .remove("last_success_at_unix_ms");
     value
 }
 
@@ -583,6 +640,71 @@ fn pause(watch: &dyn GraphWatchBackend, wait: Duration) -> Result<()> {
     }
 }
 
+fn read_graph(
+    watch: &dyn GraphWatchBackend,
+    cache: &mut BTreeMap<String, Description>,
+    first_seen: &mut BTreeMap<String, Instant>,
+    reads: &mut u64,
+) -> Result<BTreeMap<String, ObservedNode>> {
+    let nodes = observe(watch.snapshot()?);
+    *reads += 1;
+    cache.retain(|id, _| nodes.contains_key(id));
+    first_seen.retain(|id, _| nodes.contains_key(id));
+    let now = Instant::now();
+    for id in nodes.keys() {
+        first_seen.entry(id.clone()).or_insert(now);
+    }
+    Ok(nodes)
+}
+
+fn next_probe(
+    nodes: &BTreeMap<String, ObservedNode>,
+    cache: &BTreeMap<String, Description>,
+    options: &Options,
+    repeat: bool,
+) -> Result<Option<Instant>> {
+    if !options.descriptions {
+        return Ok(None);
+    }
+    Ok(selected(nodes, options)?
+        .into_iter()
+        .filter(|(_, node)| node.declared && !node.ambiguous)
+        .filter_map(|(id, node)| match cache.get(id) {
+            None => Some(Instant::now()),
+            Some(old) if old.graph != *node => Some(Instant::now()),
+            Some(old) if repeat => Some(old.attempted + options.refresh),
+            _ => None,
+        })
+        .min())
+}
+
+// Signal/output checks remain responsive; expensive Graph projection is only
+// resumed by a real change, a due description attempt, or the total deadline.
+fn await_change(
+    watch: &dyn GraphWatchBackend,
+    deadline: Option<Instant>,
+    streaming: bool,
+) -> Result<()> {
+    loop {
+        check_stop()?;
+        #[cfg(any(unix, windows))]
+        if streaming {
+            crate::process_commands::check_stream_output()?;
+        }
+        let wait = deadline.map_or(POLL, |end| {
+            end.saturating_duration_since(Instant::now()).min(POLL)
+        });
+        if wait.is_zero() {
+            return Ok(());
+        }
+        match watch.wait_for_change(wait) {
+            Ok(()) => return Ok(()),
+            Err(aos_core::Error::Timeout) => (),
+            Err(error) => return Err(error.into()),
+        }
+    }
+}
+
 fn stream(name: &str, data: &Value) -> Result<()> {
     #[cfg(any(unix, windows))]
     {
@@ -632,9 +754,11 @@ pub fn execute(
         "network":"configured connected domain and permitted discovery view",
         "business_health":"unverified","business_authorization":"unknown",
         "filters":{"node_name":options.node,"namespace":options.namespace,"endpoint_name":options.endpoint,
-            "kind":options.kind,"include_internal":options.internal,"include_clients":options.clients},
+            "kind":options.kind,"include_internal":options.internal,"include_clients":options.clients,"include_cli_nodes":options.cli_nodes},
         "description_refresh_interval_seconds":options.refresh.as_secs_f64()});
     let mut cache = BTreeMap::new();
+    let mut first_seen = BTreeMap::new();
+    let mut graph_reads = 0_u64;
     let watch_id = uuid::Uuid::new_v4().simple().to_string();
     let mut sequence = 0_u64;
     let mut previous = None::<View>;
@@ -652,8 +776,12 @@ pub fn execute(
             if verb == "watch" {
                 crate::process_commands::check_stream_output()?;
             }
-            let mut nodes = observe(watch.snapshot()?);
-            cache.retain(|id, _| nodes.contains_key(id));
+            let mut nodes = read_graph(
+                watch.as_ref(),
+                &mut cache,
+                &mut first_seen,
+                &mut graph_reads,
+            )?;
             let mut view = project(&nodes, &cache, &options)?;
             // Publish discovery before waiting on any NodeCard. Existing nodes
             // and newcomers remain visible even when every RPC times out.
@@ -685,6 +813,7 @@ pub fn execute(
                     ctx,
                     &nodes,
                     &mut cache,
+                    &first_seen,
                     &options,
                     deadline,
                     verb != "snapshot",
@@ -692,8 +821,12 @@ pub fn execute(
             {
                 // Discard metadata if its owner, ambiguity or entity set changed
                 // during RPC. Never resurrect an endpoint from a stale NodeCard.
-                nodes = observe(watch.snapshot()?);
-                cache.retain(|id, _| nodes.contains_key(id));
+                nodes = read_graph(
+                    watch.as_ref(),
+                    &mut cache,
+                    &mut first_seen,
+                    &mut graph_reads,
+                )?;
                 view = project(&nodes, &cache, &options)?;
             }
             let pending = view
@@ -718,8 +851,10 @@ pub fn execute(
                     .map(|(id, node)| (id.clone(), node.clone()))
                     .collect();
                 if matches.len() >= options.min_nodes {
-                    let mut result = inventory(&matches, nodes.len(), &scope, started);
+                    let mut result = inventory(&view, nodes.len(), &scope, started);
                     result["matched"] = json!(true);
+                    result["matched_node_ids"] = json!(matches.keys().collect::<Vec<_>>());
+                    result["selected_not_matched"] = json!(view.len() - matches.len());
                     result["match_evidence"] = json!(if options.require_descriptions {
                         "introspection"
                     } else {
@@ -744,9 +879,11 @@ pub fn execute(
             {
                 continue;
             }
-            pause(
+            let next = next_probe(&nodes, &cache, &options, verb != "snapshot")?;
+            await_change(
                 watch.as_ref(),
-                deadline.map_or(POLL, |end| end.saturating_duration_since(Instant::now())),
+                deadline.into_iter().chain(next).min(),
+                verb == "watch",
             )?;
         }
     })();
@@ -756,6 +893,7 @@ pub fn execute(
             &json!({"schema_version":1,"event":"summary","data":{
                 "watch_id":watch_id,"last_sequence":sequence,"elapsed_ms":started.elapsed().as_millis(),
                 "reason":if result.is_ok() {"timeout"} else {"error_or_signal"},
+                "graph_reads":graph_reads,
                 "selected_nodes":previous.as_ref().map_or(0, BTreeMap::len)
             }}),
         )?;

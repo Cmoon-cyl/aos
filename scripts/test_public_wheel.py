@@ -21,7 +21,7 @@ class PublicWheelTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "pyproject.toml").write_text('[project]\nlicense = "Apache-2.0"\nlicense-files = ["LICENSE"]\n')
-            (root / "LICENSE").write_text("license fixture\n")
+            (root / "LICENSE").write_bytes(b"license fixture\n")
             (root / "README.md").write_text("public readme\n")
             wheel = root / "aos_sdk-0.2.0-cp311-abi3-macosx_11_0_arm64.whl"
             prefix = "aos_sdk-0.2.0.dist-info/"

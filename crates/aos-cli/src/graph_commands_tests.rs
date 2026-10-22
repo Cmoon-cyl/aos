@@ -35,7 +35,7 @@ fn cache(
     side_effects: Value,
 ) -> BTreeMap<String, Description> {
     nodes.iter().map(|(id,node)| (id.clone(),Description {
-        graph:node.clone(),attempted:Instant::now(),checked_at:1,status:"ok",error:None,
+        graph:node.clone(),attempted:Instant::now(),checked_at:1,last_success:Some(1),status:"ok",error:None,
         card:compact_card(&json!({"summary":"A worker","effective_config":{"parameter_version":7,"parameters":{"secret":"not-for-inventory"}},
             "endpoints":node.entities.iter().filter_map(|e|e.endpoint.as_ref().map(|endpoint|json!({
                 "kind":kind_name(e.kind),"name":endpoint.name,"type_name":endpoint.type_name,
@@ -178,4 +178,79 @@ fn description_clipping_is_visible_and_wait_cannot_match_without_a_selector() {
     assert!(validate("wait", &json!({"node_name":"/n","descriptions":false})).is_err());
     assert!(validate("snapshot", &json!({"max_nodes":1.0})).is_err());
     assert!(validate("snapshot", &json!({"timeout":0.1,"settle_time":1})).is_err());
+}
+
+#[test]
+fn oversized_structured_metadata_cannot_enter_the_compact_inventory() {
+    let hostile = json!({"payload":"x".repeat(900_000)});
+    let card = compact_card(
+        &json!({"lifecycle":{"current_state":{"id":hostile,"label":hostile},
+        "gate_open":hostile,"transitioning":hostile,"epoch":hostile},
+        "effective_config":{"parameter_version":hostile}}),
+    );
+    assert!(serde_json::to_vec(&card).unwrap().len() < 1024);
+    assert_eq!(card["metadata_sanitized"], true);
+    assert!(card["parameter_version"].is_null());
+    assert!(card["lifecycle"]["gate_open"].is_null());
+    assert!(card["lifecycle"]["current_state"]["id"].is_null());
+}
+
+#[test]
+fn failed_refresh_retains_only_explicitly_stale_metadata_for_the_same_graph() {
+    let owner = node("n1", "worker", "/");
+    let nodes = observe(vec![service(&owner, "s1", "/work", "hash"), owner]);
+    let mut descriptions = cache(&nodes, json!("read_only"));
+    let failed = descriptions.get_mut("n1").unwrap();
+    failed.status = "unavailable";
+    failed.error = Some("TIMEOUT");
+    failed.checked_at = 2;
+    let view = project(&nodes, &descriptions, &options(json!({}))).unwrap();
+    assert_eq!(view["n1"]["introspection"]["stale"], true);
+    assert_eq!(view["n1"]["introspection"]["last_success_at_unix_ms"], 1);
+    assert_eq!(view["n1"]["endpoints"][0]["description_status"], "stale");
+    assert_eq!(view["n1"]["endpoints"][0]["side_effects"], "read_only");
+}
+
+#[test]
+fn endpoint_only_owners_are_explicit_and_cli_noise_can_be_requested() {
+    let owner = node("n1", "worker", "/");
+    let nodes = observe(vec![service(&owner, "s1", "/work", "hash")]);
+    let view = project(&nodes, &BTreeMap::new(), &options(json!({}))).unwrap();
+    assert_eq!(view["n1"]["introspection"]["status"], "undeclared");
+    assert!(
+        next_probe(&nodes, &BTreeMap::new(), &options(json!({})), false)
+            .unwrap()
+            .is_none()
+    );
+    let name = "aos_cli_0123456789abcdef0123456789abcdef";
+    let nodes = observe(vec![
+        node("cli", name, "/"),
+        node("app", "aos_cli_app", "/"),
+    ]);
+    assert_eq!(
+        project(&nodes, &BTreeMap::new(), &options(json!({})))
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        project(
+            &nodes,
+            &BTreeMap::new(),
+            &options(json!({"include_cli_nodes":true}))
+        )
+        .unwrap()
+        .len(),
+        2
+    );
+    assert_eq!(
+        project(
+            &nodes,
+            &BTreeMap::new(),
+            &options(json!({"node_name":format!("/{name}")}))
+        )
+        .unwrap()
+        .len(),
+        1
+    );
 }

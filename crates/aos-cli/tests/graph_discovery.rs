@@ -416,7 +416,43 @@ fn graph_cli_converges_across_routers_without_calling_business_services() {
     );
     let limited = network.finite("snapshot", json!({"namespace":"/fleet","max_nodes":1}), 2);
     assert_eq!(limited["error"]["code"], "RESOURCE_LIMIT");
+    let partial = network.finite(
+        "wait",
+        json!({"namespace":"/fleet","timeout":3,"probe_timeout":0.1}),
+        0,
+    );
+    assert_eq!(partial["data"]["nodes"].as_array().unwrap().len(), 9);
+    assert_eq!(partial["data"]["matched_node_ids"], json!([id]));
+    assert_eq!(partial["data"]["selected_not_matched"], 8);
     drop(guards);
+
+    let orphan = network
+        .raw
+        .declare_graph_entity(&GraphEntity {
+            id: "orphan-service".into(),
+            node_id: "orphan".into(),
+            node_name: "orphan".into(),
+            namespace: "/partial".into(),
+            kind: EntityKind::Service,
+            endpoint: Some(aos_core::Endpoint {
+                name: "/partial/work".into(),
+                type_name: "test/srv/Inspect".into(),
+                type_hash: service().type_hash().into(),
+            }),
+            qos: None,
+        })
+        .unwrap();
+    let started = Instant::now();
+    let partial = network.finite("snapshot", json!({"namespace":"/partial","timeout":3}), 0);
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "endpoint-only owner must not force the full timeout"
+    );
+    assert_eq!(
+        partial["data"]["nodes"][0]["introspection"]["status"],
+        "undeclared"
+    );
+    drop(orphan);
 
     // A restart must use a new ID even when its fully qualified name is stable.
     owner.destroy_node().unwrap();
@@ -480,6 +516,10 @@ fn graph_cli_converges_across_routers_without_calling_business_services() {
             .unwrap();
         finite.apply(&frame);
         if frame["event"] == "summary" {
+            assert!(
+                frame["data"]["graph_reads"].as_u64().unwrap() < 8,
+                "idle watcher repeatedly rebuilt the Graph: {frame}"
+            );
             break;
         }
     }

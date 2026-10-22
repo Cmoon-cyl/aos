@@ -433,10 +433,6 @@ fn run(security_signals: &mut security_commands::SignalGuard) -> Result<()> {
     }
     if args[0] == "graph" {
         graph_commands::validate(&args[1], &request)?;
-        #[cfg(any(unix, windows))]
-        {
-            *security_signals = Some(process_commands::Signals::install()?);
-        }
     }
     let management = if matches!(args[0].as_str(), "param" | "lifecycle") {
         Some(node_management::prepare(&request, &args[0], &args[1])?)
@@ -445,6 +441,12 @@ fn run(security_signals: &mut security_commands::SignalGuard) -> Result<()> {
     };
     phase("session_open");
     let (ctx, router_ids) = open_context(&configuration)?;
+    // Until the potentially blocking session open returns, keep default signal
+    // termination. Graph observation owns no children that need supervision.
+    #[cfg(any(unix, windows))]
+    if args[0] == "graph" {
+        *security_signals = Some(process_commands::Signals::install()?);
+    }
     operation_field("telemetry_context_id", json!(ctx.telemetry().context_id()));
     if request["logging"]["stderr"] == true {
         ctx.enable_log_capture(log_capacity)?;
