@@ -1,7 +1,8 @@
 # 一键安装与维护
 
-一键安装支持 macOS arm64、GNU/Linux x86_64 和 Windows x64。运行时版本为
-AOS 0.2.0，安装管理器和插件版本为 0.1.1，两者分别报告版本。
+一键安装支持 macOS arm64、GNU/Linux x86_64 和 Windows x64。
+运行时与安装管理器、插件分别报告版本；安装结果中的 `runtime_version` 和
+`manager_version` 为本次安装的版本，公开下载版本由插件内的固定发行目录指定。
 网络下载使用公开 GitHub 发行包；不要求 GitHub 登录。
 
 ## 安装
@@ -111,7 +112,7 @@ aos update rollback
 `aos update apply --request 文件路径`：
 
 ```json
-{"version":"0.1.1"}
+{"version":"0.1.2"}
 ```
 
 相同版本无需更新；降级使用 `update rollback`，切回上一个通过重新验证的安装。

@@ -65,7 +65,7 @@ checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
 name = "aos-bag"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aos-core",
  "aos-zenoh",
@@ -81,7 +81,7 @@ dependencies = [
 
 [[package]]
 name = "aos-cli"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aos-bag",
  "aos-core",
@@ -98,7 +98,7 @@ dependencies = [
 
 [[package]]
 name = "aos-core"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "jsonschema",
  "jsonschema-regex",
@@ -114,7 +114,7 @@ dependencies = [
 
 [[package]]
 name = "aos-launch"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aos-core",
  "nix",
@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "aos-py"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aos-bag",
  "aos-core",
@@ -140,7 +140,7 @@ dependencies = [
 
 [[package]]
 name = "aos-zenoh"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aos-core",
  "libc",
