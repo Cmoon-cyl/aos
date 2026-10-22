@@ -36,31 +36,64 @@ Node 和业务状态；每台机器的 Zenoh Router 负责连接本机与其他�
 | 保存消息并复现观察过程 | **bag**：MCAP 录制、检查、恢复与受控回放 |
 | 安全连接多个地点 | mTLS、默认拒绝 ACL、每机 Router 与显式跨 Router 连接 |
 
-## 从一次真实调用开始
+## 一键安装
 
-先按[安装指南](docs/install.md)安装平台包。包内提供原生 CLI、Python wheel、
-固定版本 Router、配置、接口、示例和文档。Python 运行环境为 CPython 3.11，
-平台组合与限制见[支持范围](docs/support.md)。
-
-在包根目录按顺序打开三个终端，前两个保持运行：
+**macOS Apple Silicon / Linux x86_64（glibc）：**
 
 ```sh
-# 1. 启动本机 Router。
-./router/zenohd --config config/zenoh-router.json5
-
-# 2. 使用已安装 SDK 的 Python 启动计算服务。
-.venv/bin/python -m examples.add_two_ints_server
-
-# 3. 发现服务并调用。
-./bin/aos node list
-./bin/aos service call --request - <<'JSON'
-{"service_name":"/add_two_ints","service_type":"aos_examples/srv/AddTwoInts","values":{"a":17,"b":25},"timeout":5}
-JSON
+curl -fsSL https://raw.githubusercontent.com/Cmoon-cyl/aos/main/install.sh | sh -s -- --non-interactive --json
 ```
 
-响应中的 `sum: 42` 是 provider 实际计算的结果。Windows 使用包内的
-`router/zenohd.exe`、`bin/aos.exe` 与 `.venv/Scripts/python.exe`；
-[快速开始](docs/getting-started.md)提供完整 PowerShell 命令、Action 成功/取消示例和停止方法。
+**Windows x64，在 PowerShell 中运行：**
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/Cmoon-cyl/aos/main/install.ps1'))) --non-interactive --json"
+```
+
+安装器校验发行包，准备独立 Python、SDK、CLI 和 Router，再启动临时服务验证
+`17 + 25 = 42`，验证后停止测试进程。无需 GitHub 登录、预装 Python 或 Rust。
+结果以 JSON 返回绝对 CLI 路径、Python 路径和验证状态。
+
+默认安装到 `~/.local/share/aos`（Windows 为 `%USERPROFILE%\.aos`），
+可用 `--prefix PATH` 指定位置。安装器会注册用户级 `aos` 命令；终端加载更新后的 PATH 后，
+可直接运行 `aos --version`。当前终端也可直接使用安装结果中的 CLI 路径。
+使用 `--no-path` 可跳过 PATH 和 shell 配置。
+
+```sh
+"$HOME/.local/share/aos/bin/aos" env ensure
+"$HOME/.local/share/aos/bin/aos" update check
+"$HOME/.local/share/aos/bin/aos" update apply
+```
+
+详细参数、更新和回滚见[一键安装与维护](docs/agent-installation.md)。
+手动解压平台包见[安装指南](docs/install.md)；自己启动 provider 的完整示例见
+[快速开始](docs/getting-started.md)。
+
+## 给 Agent 和插件用户
+
+把下面这句话交给有终端工具的 Agent：
+
+> 阅读 https://github.com/Cmoon-cyl/aos/blob/main/docs/for-agents.md，在你实际执行工具的机器上安装 AOS，验证可用后继续我的任务。
+
+安装命令追加 `--agent codex`、`--agent claude` 或 `--agent trae`，
+可以同时安装对应的 AOS Skill。参数可重复使用。
+
+完整[插件](plugins/aos/README.md)提供安装、使用和 Python 开发三个 Skill。
+Codex CLI 可运行：
+
+```sh
+codex plugin marketplace add Cmoon-cyl/aos
+codex plugin add aos@aos
+```
+
+Claude Code 可运行：
+
+```text
+/plugin install aos --marketplace Cmoon-cyl/aos
+```
+
+插件安装后运行它的 setup；首次使用也会检查并补齐 AOS 环境。
+运行时安装在 Agent 的实际执行机器上，桌面端安装插件不会自动安装到其他主机。
 
 ## 一台机器起步，多台机器协作
 
@@ -87,6 +120,7 @@ flowchart LR
 | 开始使用 | 开发应用 | 部署与维护 |
 | --- | --- | --- |
 | [安装与校验](docs/install.md) | [Python SDK](docs/python-sdk.md) | [单机与多机部署](docs/deployment.md) |
+| [Agent 安装入口](docs/for-agents.md) | [插件与 Skill](plugins/aos/README.md) | [检查更新与回滚](docs/agent-installation.md) |
 | [快速开始](docs/getting-started.md) | [CLI 与 JSON 输入输出](docs/cli.md) | [mTLS 与 ACL](docs/platform/security-cli.md) |
 | [核心概念](docs/concepts.md) | [MemoryServer 完整应用](docs/platform/memory-server.md) | [故障排查](docs/troubleshooting.md) |
 | [示例选择](docs/examples.md) | [参数与生命周期](docs/platform/managed-cli.md) | [支持范围与限制](docs/support.md) |
@@ -98,7 +132,7 @@ flowchart LR
 - **超时结束本地等待。** Service 不自动重试；Action 的普通等待超时不自动取消远端任务。
 - **取消需要协作。** provider 在安全位置检查取消意图，并明确进入 `CANCELED`。
 - **状态由应用负责。** Action 结果保存在 provider 内存中；进程重启不会恢复旧 goal。
-- **开发网络与安全部署有不同配置。** 默认 TCP Router 监听网络接口；跨不可信网络使用显式 mTLS/ACL。
+- **连接范围由配置决定。** 一键安装的托管 Router 只监听本机；平台包另带开发网络配置。跨不可信网络使用显式 mTLS/ACL。
 
 AOS 参考 ROS 2 Jazzy 的通信与 Action 语义，采用自己的 JSON 类型和 wire key。
 它不与现有 ROS 节点直接互通，也不承诺硬实时、持久任务恢复或多 Router 高可用。

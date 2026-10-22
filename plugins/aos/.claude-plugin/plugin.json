@@ -1,0 +1,10 @@
+{
+  "name": "aos",
+  "version": "0.1.1",
+  "description": "Install, update, and use AOS services and Python nodes.",
+  "author": {
+    "name": "Cmoon-cyl"
+  },
+  "repository": "https://github.com/Cmoon-cyl/aos",
+  "license": "Apache-2.0"
+}

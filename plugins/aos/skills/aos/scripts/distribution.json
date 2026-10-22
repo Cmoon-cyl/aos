@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "manager_version": "0.1.1",
+  "repository": "Cmoon-cyl/aos",
+  "release_prefix": "aos-agent-v",
+  "runtime_version": "0.2.0",
+  "runtime_tag": "v0.2.0",
+  "python": "3.11.15",
+  "uv_version": "0.13.5",
+  "platforms": {
+    "macos-arm64": {
+      "asset": "aos-0.2.0-macos-arm64-728869949fbd.tar.gz",
+      "sha256": "36b7377756c13e49e49752fc9b8d58c09c27da6e950f4619060231fe183263b7"
+    },
+    "linux-x86_64": {
+      "asset": "aos-0.2.0-linux-x86_64-728869949fbd.tar.gz",
+      "sha256": "0b11ea8757469a037a7c0c2f0d8668b29e64a1537a2cac3520b5ed2a2e7c77a6"
+    },
+    "windows-x86_64": {
+      "asset": "aos-0.2.0-windows-x86_64-728869949fbd.zip",
+      "sha256": "453b6bd04f52cc59b07551d568faab9474d1f828f479dbb7a8d9c8b920268c7c"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "aos",
+  "owner": {"name": "Cmoon-cyl"},
+  "plugins": [
+    {
+      "name": "aos",
+      "source": "./plugins/aos",
+      "description": "Install, update and use AOS services and Python nodes.",
+      "version": "0.1.1"
+    }
+  ]
+}

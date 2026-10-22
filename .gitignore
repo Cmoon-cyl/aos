@@ -18,7 +18,12 @@ __pycache__/
 /coverage/
 /.remember/
 /.codex/
-/.agents/
+/.agents/*
+!/.agents/plugins/
+/.agents/plugins/*
+!/.agents/plugins/marketplace.json
 /.env
 /.env.*
 !/.env.example
+/logs/
+*.log

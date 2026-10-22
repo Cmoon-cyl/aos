@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "aos",
+  "version": "0.1.1",
+  "description": "Install, update, and use AOS to discover services and collaborate across machines.",
+  "author": {
+    "name": "Cmoon-cyl"
+  },
+  "repository": "https://github.com/Cmoon-cyl/aos",
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/aos-setup/SKILL.md"
+    }
+  },
+  "license": "Apache-2.0"
+}
