@@ -6,6 +6,9 @@ use serde_json::{json, Map, Value};
 pub const LIST_DISCOVERY_SECONDS: f64 = 0.5;
 
 pub const COMMANDS: &[(&str, &str, &str)] = &[
+    ("graph", "snapshot", "Read one compact inventory of observed nodes, their endpoints and bounded NodeCard evidence."),
+    ("graph", "watch", "Watch node and endpoint changes with a baseline and sequenced JSONL deltas; finite by default."),
+    ("graph", "wait", "Wait for matching nodes or capabilities without invoking business endpoints."),
     ("security", "compile", "Compile an explicit certificate-subject policy to native default-deny ACLs without opening the network."),
     ("security", "router-config", "Generate a TLS-only router configuration and reviewable expanded ACL grants offline."),
     ("security", "client-config", "Generate the exact TLS-only client configuration from an explicit profile offline."),
@@ -583,6 +586,14 @@ pub fn request_schema(group: &str, verb: &str) -> Option<Value> {
         }
         _ => {}
     }
+    if group == "graph" {
+        fields.extend(
+            crate::graph_commands::request_fields(verb)
+                .as_object()
+                .unwrap()
+                .clone(),
+        );
+    }
     Some(json!({
         "$schema":"https://json-schema.org/draft/2020-12/schema",
         "type":"object","properties":fields,"required":required,"additionalProperties":false,
@@ -603,6 +614,7 @@ pub fn describe(group: &str, verb: &str) -> Option<Value> {
         .find(|(g, v, _)| *g == group && *v == verb)?;
     let streaming = (group == "topic" && matches!(verb, "pub" | "echo" | "hz" | "bw" | "delay"))
         || (group == "action" && verb == "send_goal")
+        || (group == "graph" && verb == "watch")
         || (group == "security" && verb == "serve");
     let mut description = json!({
         "command":format!("aos {group} {verb}"),
@@ -623,6 +635,11 @@ pub fn describe(group: &str, verb: &str) -> Option<Value> {
             "1":"internal or remote execution error","2":"invalid request",
             "3":"discovery or communication failure","4":"wait timeout","130":"SIGINT"}
     });
+    if group == "graph" {
+        description["discovery"] = crate::graph_commands::contract();
+        description["defaults"] = json!({"timeout_seconds":if verb == "snapshot" {5} else {30},
+            "settle_time_seconds":0.5,"probe_timeout_seconds":0.5,"refresh_interval_seconds":5});
+    }
     if group == "security" && verb == "serve" {
         description["defaults"] =
             json!({"startup_timeout_seconds":10,"shutdown_timeout_seconds":5});

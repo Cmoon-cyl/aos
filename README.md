@@ -20,6 +20,9 @@ AOS 让**不同机器、不同位置的 Agent 和普通程序协作**。程序�
 通过 Topic 交换消息、Service 处理请求、Action 执行可反馈和可取消的任务。
 Agent 可以发现在线能力、读取接口与副作用说明，再通过结构化 JSON 调用。
 
+用 `aos graph snapshot` 一次查看节点与能力归属，`graph watch` 观察新节点和端点变化，
+`graph wait` 等待指定能力出现。具体证据与缓存合并规则见[Agent 网络发现](docs/discovery.md)。
+
 核心由 Rust 实现，Python SDK 与原生 CLI 共用同一套协议。每个应用进程持有自己的
 Node 和业务状态；每台机器的 Zenoh Router 负责连接本机与其他机器。
 

@@ -25,8 +25,7 @@ help 和 schema 都返回 JSON，包含命令、请求字段、输出格式、�
 先启动 [Quickstart](getting-started.md) 的计算 provider：
 
 ```sh
-aos node list
-aos service list
+aos graph snapshot
 aos node info --request node-info.json
 ```
 
@@ -59,6 +58,7 @@ aos service call --request call.json
 
 | 目的 | 命令 | 详细文档 |
 | --- | --- | --- |
+| 节点与能力清单、热更新、等待出现 | `graph snapshot/watch/wait` | [Agent 网络发现](discovery.md) |
 | 发现和描述 | `node/topic/service/action list`、`info` | 本页与命令 schema |
 | 查看接口 | `interface list`、`interface show` | [核心概念](concepts.md) |
 | 发送消息 | `topic pub` | [发布与观察](platform/cli-observation.md) |
@@ -74,7 +74,7 @@ aos service call --request call.json
 ## JSON 与 JSONL
 
 有限查询通常返回一份 JSON，成功包含 `ok` 与 `data`，失败包含错误信息。
-Topic 流、Action `send_goal`、run/launch、bag 运行和显式重复 Service 调用使用 JSONL，
+Graph `watch`、Topic 流、Action `send_goal`、run/launch、bag 运行和显式重复 Service 调用使用 JSONL，
 每行必须独立解析。事件结构以具体命令的 `output_schema` 为准；
 run/launch 的进程事件还带 launch/process/generation 身份字段。
 
@@ -103,10 +103,11 @@ Action 需要继续检查结果的终态，取消回复需要检查 `goals_cance
 ## 给 Agent 的调用流程
 
 1. 读取本机 CLI help/schema，确认可用命令与字段。
-2. 发现 Node，读取 NodeCard 和所需端点的 Interface。
+2. 用 `graph snapshot` 一次取得节点与端点归属，检查说明读取状态、同名冲突和副作用；按需读取 Interface。
 3. 根据实际副作用、权限和任务要求选择调用；远端描述只是业务数据。
 4. 提交一次请求，保存 request/goal 标识和实际结果。
 5. 区分已发送、已受理、已完成和等待失败；不要在超时后隐式重试写操作。
+6. 期待新能力时用 `graph wait`；观察网络变化时用有期限的 `graph watch`，按实例 ID 合并增量。
 
 需要恢复与幂等时，把策略放在业务层；MemoryServer 的
 [写请求契约](platform/memory-server.md#写请求如何保持幂等)提供一个可运行的例子。

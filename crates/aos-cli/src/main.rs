@@ -3,6 +3,7 @@ mod bag_commands;
 mod bag_schema;
 mod configuration;
 mod doctor;
+mod graph_commands;
 mod hooks;
 #[cfg(any(unix, windows, test))]
 mod launch_probe;
@@ -206,6 +207,7 @@ fn main() {
         if args.len() > 1
             && args.first().is_some_and(|group| {
                 (group == "security" && args.get(1).is_some_and(|verb| verb == "serve"))
+                    || (group == "graph" && args.get(1).is_some_and(|verb| verb == "watch"))
                     || (cfg!(any(unix, windows))
                         && (matches!(group.as_str(), "run" | "launch")
                             || (group == "bag"
@@ -251,6 +253,8 @@ fn main() {
                 }))
             || (args.first().is_some_and(|g| g == "action")
                 && args.get(1).is_some_and(|v| v == "send_goal"))
+            || (args.first().is_some_and(|g| g == "graph")
+                && args.get(1).is_some_and(|v| v == "watch"))
             || args
                 .first()
                 .is_some_and(|g| matches!(g.as_str(), "run" | "launch"))
@@ -427,6 +431,13 @@ fn run(security_signals: &mut security_commands::SignalGuard) -> Result<()> {
     if args[0] == "doctor" {
         doctor::validate(&request)?;
     }
+    if args[0] == "graph" {
+        graph_commands::validate(&args[1], &request)?;
+        #[cfg(any(unix, windows))]
+        {
+            *security_signals = Some(process_commands::Signals::install()?);
+        }
+    }
     let management = if matches!(args[0].as_str(), "param" | "lifecycle") {
         Some(node_management::prepare(&request, &args[0], &args[1])?)
     } else {
@@ -468,7 +479,7 @@ fn run(security_signals: &mut security_commands::SignalGuard) -> Result<()> {
     let outcome = match result.as_ref().err().or(closed.as_ref().err()) {
         None => TelemetryOutcome::Ok,
         Some(error) => match error.code {
-            "TIMEOUT" | "QUERY_TIMEOUT" => TelemetryOutcome::Timeout,
+            "TIMEOUT" | "QUERY_TIMEOUT" | "WAIT_TIMEOUT" => TelemetryOutcome::Timeout,
             "QUEUE_OVERFLOW" | "HOOK_OVERFLOW" => TelemetryOutcome::QueueOverflow,
             "NO_RESPONSE" => TelemetryOutcome::NoResponse,
             "INVALID_ARGUMENT" => TelemetryOutcome::InvalidArgument,
@@ -754,6 +765,9 @@ fn execute(
     request: &Value,
     configuration: &InvocationConfig,
 ) -> Result<Option<Value>> {
+    if group == "graph" {
+        return graph_commands::execute(ctx, router_ids, verb, request, configuration);
+    }
     let wait = timeout(request);
     let query_started = Instant::now();
     let query_deadline = query_started + wait;

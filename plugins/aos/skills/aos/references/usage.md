@@ -7,8 +7,7 @@ examples below call it aos for readability.
     aos --version
     aos env status
     aos env ensure
-    aos node list
-    aos service list
+    aos graph snapshot
     aos schema service call
 
 Write a JSON request to a file and call aos service call --request that-file.json.
@@ -24,6 +23,9 @@ Select configuration using AOS_ZENOH_CONFIG and AOS_DOMAIN_ID, or the documented
 request fields. The managed local environment uses an explicit loopback client
 configuration and a Router on 127.0.0.1:7447. env ensure never joins other machines.
 Read the installed docs/deployment.md for per-machine Router links and mTLS.
+
+Read references/discovery.md for graph snapshot/watch/wait, evidence states and
+how to merge node and endpoint changes without guessing availability.
 
 Native commands use GROUP VERB --request PATH|- and describe their contract with
 schema GROUP VERB. Check actual command schemas instead of inventing business

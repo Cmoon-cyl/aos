@@ -18,6 +18,7 @@ FILES = (
     ".codex-plugin/plugin.json", ".claude-plugin/plugin.json",
     "skills/aos/SKILL.md", "skills/aos-setup/SKILL.md", "skills/aos-develop/SKILL.md",
     "skills/aos/references/usage.md", "skills/aos/references/developing.md",
+    "skills/aos/references/discovery.md",
     "skills/aos/scripts/aos_manager.py", "skills/aos/scripts/distribution.json",
     "skills/aos/scripts/setup.sh", "skills/aos/scripts/setup.ps1",
 )
