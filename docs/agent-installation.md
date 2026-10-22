@@ -48,7 +48,9 @@ v14 x64 Runtime 后重试。不会自动申请管理员权限或更改系统级�
 已有非 AOS 管理的同名入口会保留，并在注册结果中报告冲突。Windows 将安装目录的 `bin` 加入用户 PATH；
 `aos.cmd` 是入口文件名，日常输入 `aos` 即可。
 当 `data.command_registration.restart_terminal_required` 为 `true` 时，重新打开终端应用
-后使用短命令；当前终端继续使用 `data.cli`。`--no-path` 适用于隔离安装和自动化测试。
+后使用短命令。Windows 的父进程可能仍缓存旧 PATH；若重开终端后仍找不到 `aos`，
+可注销并重新登录。当前终端始终可以使用 `data.cli`，无需等待环境刷新。
+`--no-path` 适用于隔离安装和自动化测试。
 更新和回滚沿用已注册的入口，不再修改 PATH。
 `data.command_registration.status` 为 `registered` 表示已配置入口，`skipped` 表示按
 `--no-path` 跳过；`conflict` 或 `failed` 表示短命令注册未完成，原因在同一字段内。

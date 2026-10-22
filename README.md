@@ -55,8 +55,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create
 结果以 JSON 返回绝对 CLI 路径、Python 路径和验证状态。
 
 默认安装到 `~/.local/share/aos`（Windows 为 `%USERPROFILE%\.aos`），
-可用 `--prefix PATH` 指定位置。安装器会注册用户级 `aos` 命令；新打开的终端可直接
-运行 `aos --version`。当前终端也可直接使用安装结果中的 CLI 路径。
+可用 `--prefix PATH` 指定位置。安装器会注册用户级 `aos` 命令；终端加载更新后的 PATH 后，
+可直接运行 `aos --version`。当前终端也可直接使用安装结果中的 CLI 路径。
 使用 `--no-path` 可跳过 PATH 和 shell 配置。
 
 ```sh
