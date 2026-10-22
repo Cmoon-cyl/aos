@@ -5,18 +5,18 @@
   "assets": [
     {
       "name": "aos-agent-0.1.0.tar.gz",
-      "digest": "sha256:4b08e73cf33e5cf6683ed6c3cca3ae339827f0ba924921d68cf9d1053009f285",
-      "size": 23362
+      "digest": "sha256:b65984ae01f46653d75f610cd147ff566d64c167b00068b6634cd501317b368c",
+      "size": 23789
     },
     {
       "name": "aos-agent-0.1.0.zip",
-      "digest": "sha256:b217965ea2d3308aff2048bb07daadb67c11febafb93515259f5fd6dfee559c3",
-      "size": 27574
+      "digest": "sha256:4877a61454ecf9326923722ece380bfedb7fe2f27ca8e2f12468dc2a0c526e8f",
+      "size": 28066
     },
     {
       "name": "aos.plugin",
-      "digest": "sha256:2955d1316266cebbf2d7a3ef0274beac78cb5feda230e6e1bb19e11c83bda04d",
-      "size": 27294
+      "digest": "sha256:6d5156f5af79b68a850ff4484bf2557df5131f51b1e036127c388b50e2ef90b5",
+      "size": 27786
     }
   ]
 }

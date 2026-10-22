@@ -47,5 +47,5 @@ $env:UV_PYTHON_BIN_DIR = Join-Path $Prefix 'bootstrap\bin'
 if ($LASTEXITCODE -ne 0) { throw 'Managed Python installation failed' }
 $Python = (& $Uv python find --no-config --no-project --managed-python 3.11.15).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Managed Python was not found' }
-& $Python -I (Join-Path $ScriptDirectory 'aos_manager.py') install --uv $Uv @InstallerArgs
+& $Python -X utf8 -I (Join-Path $ScriptDirectory 'aos_manager.py') install --uv $Uv @InstallerArgs
 if ($LASTEXITCODE -ne 0) { throw "AOS installation failed (exit $LASTEXITCODE)" }

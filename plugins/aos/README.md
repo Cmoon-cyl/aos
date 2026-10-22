@@ -12,8 +12,12 @@ In Claude Code, install from the repository marketplace:
 
     /plugin install aos --marketplace Cmoon-cyl/aos
 
-In Codex, use the repository marketplace or import the aos.plugin release asset,
-then run the plugin's setup flow. In TRAE CLI, install a checked-out plugin:
+In Codex CLI, add the repository marketplace and install its plugin:
+
+    codex plugin marketplace add Cmoon-cyl/aos
+    codex plugin add aos@aos
+
+Then run the plugin's setup flow. In TRAE CLI, install a checked-out plugin:
 
     traecli plugin install ./plugins/aos
 

@@ -48,7 +48,7 @@ class Failure(Exception):
 
 def emit(data, *, ok=True):
     print(json.dumps({"ok": ok, "data" if ok else "error": data},
-                     ensure_ascii=False, allow_nan=False), flush=True)
+                     ensure_ascii=True, allow_nan=False), flush=True)
 
 
 def log(message):
@@ -68,6 +68,24 @@ def write_json(path, value):
             os.chmod(temp, 0o600)
             json.dump(value, stream, ensure_ascii=False, indent=2, allow_nan=False)
             stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temp, path)
+    finally:
+        temp.unlink(missing_ok=True)
+
+
+def write_text_if_changed(path, source, *, mode=0o644):
+    path = Path(path)
+    if path.is_file() and path.read_bytes() == source.encode("utf-8"):
+        if os.name != "nt":
+            path.chmod(mode)
+        return
+    temp = path.with_name(path.name+"."+uuid.uuid4().hex+".tmp")
+    try:
+        with temp.open("x", encoding="utf-8", newline="") as stream:
+            os.chmod(temp, mode)
+            stream.write(source)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temp, path)
@@ -121,7 +139,7 @@ def clean_environment():
 def run(command, *, cwd=None, env=None, input=None, timeout=180):
     try:
         result = subprocess.run(list(map(str, command)), cwd=cwd, env=env,
-                                input=input, text=True, stdout=subprocess.PIPE,
+                                input=input, text=True, encoding="utf-8", stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE, timeout=timeout)
     except subprocess.TimeoutExpired as error:
         raise Failure("COMMAND_TIMEOUT", f"{Path(str(command[0])).name} timed out.") from error
@@ -272,7 +290,8 @@ def verify_bundle(bundle, distribution, host):
             or manifest.get("packaging_tracked_changes")
             or manifest.get("zenohd", {}).get("bundled") is not True):
         raise Failure("UNVERIFIED_PACKAGE", "Runtime package is not the accepted platform bundle.")
-    inventory = {p.relative_to(bundle).as_posix() for p in bundle.rglob("*") if p.is_file()}
+    inventory = {p.relative_to(bundle).as_posix() for p in bundle.rglob("*")
+                 if p.is_file() and p.suffix != ".pyc"}
     if inventory != set(manifest["files"]) | {"manifest.json"}:
         raise Failure("INVENTORY_MISMATCH", "Package files differ from the manifest.")
     for name, record in manifest["files"].items():
@@ -286,7 +305,8 @@ def verify_bundle(bundle, distribution, host):
 def tree_digest(root):
     summary = hashlib.sha256()
     for path in sorted(root.rglob("*")):
-        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc":
+        if (path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+                and path.name not in ("installed-prefix.json", ".aos-managed-skill.json")):
             summary.update(path.relative_to(root).as_posix().encode())
             summary.update(bytes.fromhex(digest(path)))
     return summary.hexdigest()
@@ -362,7 +382,7 @@ def self_test(current, output):
     files = []
     report = {"status": "running", "started": time.time(), "scope": "isolated-loopback-service"}
     try:
-        run([current["python"], "-I", "-c",
+        run([current["python"], "-X", "utf8", "-I", "-c",
              "import aos_sdk,aos_sdk._native; print(aos_sdk.__version__)"], env=env)
         run([current["native_cli"], "--help"], env=env)
         run([current["router"], "--version"], env=env)
@@ -380,11 +400,11 @@ def self_test(current, output):
         router = start("router", [current["router"], "--config", router_config],
                        Path(current["router"]).parent)
         wait_port(port, router)
-        provider = start("provider", [current["python"], "-u", "-m", "examples.add_two_ints_server",
+        provider = start("provider", [current["python"], "-X", "utf8", "-u", "-m", "examples.add_two_ints_server",
                                      "--config", session], current["bundle"])
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
-            lines = (output / "provider.stdout").read_text().splitlines()
+            lines = (output / "provider.stdout").read_text(encoding="utf-8").splitlines()
             if any('"ready": true' in line for line in lines):
                 break
             if provider.poll() is not None:
@@ -415,7 +435,7 @@ def self_test(current, output):
 
 def install_dispatcher(prefix, python):
     # The dispatcher never changes with a release. Only current.json is switched.
-    source = (
+    legacy_source = (
         "import json,os,pathlib,sys\n"
         "root=pathlib.Path(__file__).resolve().parent\n"
         "state=json.loads((root/'current.json').read_text(encoding='utf-8'))\n"
@@ -424,10 +444,22 @@ def install_dispatcher(prefix, python):
         "os.execv(state['python'],[state['python'],'-I',state['manager'],"
         "'_cli','--prefix',str(root),'--',*sys.argv[1:]])\n"
     )
+    source = (
+        "import json,os,pathlib,subprocess,sys\n"
+        "root=pathlib.Path(__file__).resolve().parent\n"
+        "state=json.loads((root/'current.json').read_text(encoding='utf-8'))\n"
+        "release=pathlib.Path(state['release']).resolve()\n"
+        "assert release.is_relative_to((root/'releases').resolve())\n"
+        "command=[state['python'],'-X','utf8','-I',state['manager'],'_cli','--prefix',"
+        "str(root),'--',*sys.argv[1:]]\n"
+        "if os.name=='nt':\n"
+        "    raise SystemExit(subprocess.call(command))\n"
+        "os.execv(command[0],command)\n"
+    )
     path = prefix / "dispatch.py"
-    if path.exists() and path.read_text() != source:
+    if path.exists() and path.read_text(encoding="utf-8") not in (source, legacy_source):
         raise Failure("ENTRYPOINT_CONFLICT", "The existing AOS dispatcher was modified.")
-    path.write_text(source, encoding="utf-8")
+    write_text_if_changed(path, source)
     binary = prefix / "bin"
     binary.mkdir(exist_ok=True)
     if os.name == "nt":
@@ -435,12 +467,22 @@ def install_dispatcher(prefix, python):
         if any(c in str(prefix) + str(python) for c in "%\r\n"):
             raise Failure("UNSUPPORTED_PATH", "Use an installation path without %, CR, or LF.")
         shim = binary / "aos.cmd"
-        shim.write_text(f'@echo off\r\n"{python}" -I "{path}" %*\r\n', encoding="utf-8")
+        # Keep the launcher ASCII: cmd uses its console code page to read batch
+        # files. %~dp0 expands the actual Unicode directory without decoding it
+        # from the batch file. A managed interpreter always lives in the prefix.
+        try:
+            interpreter = "%~dp0"+os.path.relpath(python, binary)
+        except ValueError:
+            interpreter = str(python)  # Direct developer invocation across drives.
+        if not interpreter.isascii():
+            raise Failure("UNSUPPORTED_PATH", "Use setup.ps1 to prepare a managed interpreter.")
+        shim_source = (f'@echo off\r\nsetlocal DisableDelayedExpansion\r\n'
+                       f'"{interpreter}" -X utf8 -I "%~dp0..\\dispatch.py" %*\r\n')
+        write_text_if_changed(shim, shim_source)
     else:
         shim = binary / "aos"
-        shim.write_text("#!/bin/sh\nexec " + shlex.quote(str(python)) + " -I "
-                        + shlex.quote(str(path)) + ' "$@"\n', encoding="utf-8")
-        shim.chmod(0o755)
+        write_text_if_changed(shim, "#!/bin/sh\nexec " + shlex.quote(str(python)) + " -X utf8 -I "
+                              + shlex.quote(str(path)) + ' "$@"\n', mode=0o755)
     return str(shim)
 
 
@@ -498,7 +540,7 @@ def install(prefix, uv, *, archive=None, agents=(), force=False, package_root=PL
     version(distribution["runtime_version"])
     host = host_platform()
     record = distribution["platforms"][host]
-    manager_hash = tree_digest(package_root)
+    manager_hash = tree_digest(package_root/"skills/aos")
     with lock(prefix):
         skill_preflight(agents)
         old = state(prefix, required=False, check_components=False)
@@ -679,7 +721,7 @@ def ensure_environment(prefix, current):
             options = {"start_new_session": True} if os.name != "nt" else {
                 "creationflags": subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS}
             process = subprocess.Popen(
-                [current["python"], "-I", current["manager"], "_supervise",
+                [current["python"], "-X", "utf8", "-I", current["manager"], "_supervise",
                  "--prefix", str(prefix), "--request", str(request)],
                 stdin=subprocess.DEVNULL, stdout=output, stderr=output, **options)
         deadline = time.monotonic()+20

@@ -78,7 +78,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create
 可以同时安装对应的 AOS Skill。参数可重复使用。
 
 完整[插件](plugins/aos/README.md)提供安装、使用和 Python 开发三个 Skill。
-Codex 可使用仓库插件目录或发行附件 `aos.plugin`；Claude Code 可运行：
+Codex CLI 可运行：
+
+```sh
+codex plugin marketplace add Cmoon-cyl/aos
+codex plugin add aos@aos
+```
+
+Claude Code 可运行：
 
 ```text
 /plugin install aos --marketplace Cmoon-cyl/aos

@@ -68,4 +68,4 @@ export UV_CACHE_DIR="$prefix/cache/uv"
 export UV_PYTHON_BIN_DIR="$prefix/bootstrap/bin"
 "$uv" python install --no-config --no-bin --no-registry 3.11.15 >&2
 python=$("$uv" python find --no-config --no-project --managed-python 3.11.15)
-exec "$python" -I "$script_dir/aos_manager.py" install --uv "$uv" "$@"
+exec "$python" -X utf8 -I "$script_dir/aos_manager.py" install --uv "$uv" "$@"

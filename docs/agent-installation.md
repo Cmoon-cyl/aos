@@ -32,7 +32,7 @@ v14 x64 Runtime 后重试。不会自动申请管理员权限或更改系统级�
 | `--agent codex` | 同时安装 Skill 到用户的 `~/.agents/skills/aos` |
 | `--agent claude` | 同时安装 Skill 到用户的 `~/.claude/skills/aos` |
 | `--agent trae` | 同时安装 Skill 到用户的 `~/.trae/skills/aos` |
-| `--non-interactive --json` | 无交互执行；安装器始终返回结构化 JSON |
+| `--non-interactive --json` | 无交互执行；安装管理器返回结构化 JSON |
 
 已有同名且不由 AOS 管理的 Skill 会被保留，并返回冲突错误。
 插件及 Skill 的发现方式见[插件说明](../plugins/aos/README.md)。
@@ -45,6 +45,8 @@ v14 x64 Runtime 后重试。不会自动申请管理员权限或更改系统级�
 成功需同时满足 `ok: true`、`data.verification.status: "passed"`，
 以及 `data.verification.service_response.sum: 42`。验证会临时启动独立的
 loopback Router 与 provider，最后停止它们。安装成功不代表后台服务已常驻。
+在 Python 尚未就绪的下载引导阶段，错误可能只有 stderr 和非零退出码；
+没有成功 JSON 时按安装失败处理。
 
 ## 本机环境
 
@@ -66,6 +68,7 @@ aos env stop
 配置位于安装目录的 `config/router.json5` 和 `config/session.json5`。
 已有配置不会被安装或更新覆盖。修改 Router 配置后，需要显式执行
 `env stop` 再 `env ensure`；这会中断依赖该 Router 的应用。
+托管配置编辑时保持标准 JSON 格式，不使用注释或尾逗号。
 
 连接已有部署时，显式设置 `AOS_ZENOH_CONFIG` 和 `AOS_DOMAIN_ID`。
 跨机 Router 连接与安全配置见[部署指南](deployment.md)。
@@ -88,6 +91,7 @@ aos update rollback
 和原生运行时。候选版本安装到独立目录，通过文件校验和真实 Service 测试后，
 才原子替换 `current.json`。失败的候选版本不替换当前版本；安装日志保留在本机。
 重复安装会重新检查已有文件和服务调用；同一目录的安装由锁串行执行。
+等待超过 120 秒会返回 `INSTALL_BUSY`，可在前一项操作结束后重试。
 
 指定一个已发行管理器版本时，将下列 JSON 保存为文件，再传入
 `aos update apply --request 文件路径`：
